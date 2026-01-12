@@ -7,26 +7,10 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// ==================== ENUMS ====================
-
-enum UserRole {
-  ADMIN
-  EMPLOYEE
-}
-
-enum MachineType {
-  CNC
-  LASER
-  CHAMPS
-  PANNEAUX
-}
-
-enum DevisStatus {
-  DRAFT
-  VALIDATED
-  INVOICED
-  CANCELLED
-}
+// ==================== ENUMS (as String for SQLite) ====================
+// UserRole: ADMIN | EMPLOYEE
+// MachineType: CNC | LASER | CHAMPS | PANNEAUX
+// DevisStatus: DRAFT | VALIDATED | INVOICED | CANCELLED
 
 // ==================== MODELS ====================
 
@@ -36,7 +20,7 @@ model User {
   password      String    // bcrypt hashed
   firstName     String
   lastName      String
-  role          UserRole  @default(EMPLOYEE)
+  role          String    @default("EMPLOYEE") // ADMIN | EMPLOYEE
   isActive      Boolean   @default(true)
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
@@ -49,11 +33,11 @@ model User {
 }
 
 model UserMachine {
-  id        String      @id @default(uuid())
+  id        String    @id @default(uuid())
   userId    String
-  machine   MachineType
+  machine   String    // CNC | LASER | CHAMPS | PANNEAUX
   
-  user      User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   
   @@unique([userId, machine])
   @@map("user_machines")
@@ -76,11 +60,11 @@ model Client {
 }
 
 model MachinePricing {
-  id            String      @id @default(uuid())
-  machineType   MachineType @unique
-  pricePerUnit  Decimal     // per minute, per meter, or per unit
+  id            String    @id @default(uuid())
+  machineType   String    @unique // CNC | LASER | CHAMPS | PANNEAUX
+  pricePerUnit  Decimal   // per minute, per meter, or per unit
   description   String?
-  updatedAt     DateTime    @updatedAt
+  updatedAt     DateTime  @updatedAt
   
   @@map("machine_pricing")
 }
@@ -117,21 +101,21 @@ model FixedService {
 }
 
 model Devis {
-  id            String      @id @default(uuid())
-  reference     String      @unique  // DEV-2024-0001
-  status        DevisStatus @default(DRAFT)
-  totalAmount   Decimal     @default(0)
+  id            String    @id @default(uuid())
+  reference     String    @unique  // DEV-2024-0001
+  status        String    @default("DRAFT") // DRAFT | VALIDATED | INVOICED | CANCELLED
+  totalAmount   Decimal   @default(0)
   notes         String?
-  createdAt     DateTime    @default(now())
-  updatedAt     DateTime    @updatedAt
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
   validatedAt   DateTime?
   
   // Relations
   clientId      String
-  client        Client      @relation(fields: [clientId], references: [id])
+  client        Client    @relation(fields: [clientId], references: [id])
   
   createdById   String
-  createdBy     User        @relation("CreatedBy", fields: [createdById], references: [id])
+  createdBy     User      @relation("CreatedBy", fields: [createdById], references: [id])
   
   lines         DevisLine[]
   services      DevisService[]
@@ -141,29 +125,28 @@ model Devis {
 }
 
 model DevisLine {
-  id            String      @id @default(uuid())
-  machineType   MachineType
+  id            String    @id @default(uuid())
+  machineType   String    // CNC | LASER | CHAMPS | PANNEAUX
   description   String?
   
   // Calculation inputs
-  minutes       Decimal?    // For CNC, Laser
-  meters        Decimal?    // For Champs
-  
-  quantity      Int?                             // For Panneaux
+  minutes       Decimal?  // For CNC, Laser
+  meters        Decimal?  // For Champs
+  quantity      Int?      // For Panneaux
   
   // Pricing at time of creation
   unitPrice     Decimal
-  materialCost  Decimal     @default(0)
+  materialCost  Decimal   @default(0)
   lineTotal     Decimal
   
-  createdAt     DateTime    @default(now())
+  createdAt     DateTime  @default(now())
   
   // Relations
   devisId       String
-  devis         Devis       @relation(fields: [devisId], references: [id], onDelete: Cascade)
+  devis         Devis     @relation(fields: [devisId], references: [id], onDelete: Cascade)
   
   materialId    String?
-  material      Material?   @relation(fields: [materialId], references: [id])
+  material      Material? @relation(fields: [materialId], references: [id])
   
   @@map("devis_lines")
 }

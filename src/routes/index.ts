@@ -7,6 +7,7 @@ import invoiceRoutes from './invoice.routes';
 import machineRoutes from './machine.routes';
 import serviceRoutes from './service.routes';
 import materialRoutes from './material.routes';
+import dashboardRoutes from './dashboard.routes';
 
 const router = Router();
 
@@ -18,6 +19,7 @@ router.use('/invoices', invoiceRoutes);
 router.use('/machines', machineRoutes);
 router.use('/services', serviceRoutes);
 router.use('/materials', materialRoutes);
+router.use('/dashboard', dashboardRoutes);
 
 // Health check
 router.get('/health', (_req, res) => {
@@ -25,3 +27,4 @@ router.get('/health', (_req, res) => {
 });
 
 export default router;
+
