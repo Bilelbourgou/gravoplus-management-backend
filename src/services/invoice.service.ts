@@ -2,7 +2,7 @@ import PDFDocument from 'pdfkit';
 import prisma from '../config/database';
 import { ApiError } from '../middleware';
 import { DevisStatus } from '../types';
-import { Decimal } from '@prisma/client/runtime/library';
+
 
 export class InvoiceService {
     /**

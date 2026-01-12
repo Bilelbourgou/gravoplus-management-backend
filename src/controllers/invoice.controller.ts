@@ -18,7 +18,7 @@ export class InvoiceController {
     async getById(req: Request, res: Response, next: NextFunction) {
         try {
             const { id } = req.params;
-            const invoice = await invoiceService.getInvoiceById(id);
+            const invoice = await invoiceService.getInvoiceById(id as string);
 
             res.json({
                 success: true,
@@ -33,7 +33,7 @@ export class InvoiceController {
         try {
             const { devisId } = req.params;
 
-            const invoice = await invoiceService.createInvoiceFromDevis(devisId);
+            const invoice = await invoiceService.createInvoiceFromDevis(devisId as string);
 
             res.status(201).json({
                 success: true,
@@ -48,8 +48,8 @@ export class InvoiceController {
         try {
             const { id } = req.params;
 
-            const pdfBuffer = await invoiceService.generatePDF(id);
-            const invoice = await invoiceService.getInvoiceById(id);
+            const pdfBuffer = await invoiceService.generatePDF(id as string);
+            const invoice = await invoiceService.getInvoiceById(id as string);
 
             res.setHeader('Content-Type', 'application/pdf');
             res.setHeader(

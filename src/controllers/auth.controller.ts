@@ -87,7 +87,7 @@ export class AuthController {
             const { id } = req.params;
             const { firstName, lastName, role, password } = req.body;
 
-            const user = await authService.updateUser(id, {
+            const user = await authService.updateUser(id as string, {
                 firstName,
                 lastName,
                 role,
@@ -116,7 +116,7 @@ export class AuthController {
                 return;
             }
 
-            const user = await authService.assignMachines(id, machines as MachineType[]);
+            const user = await authService.assignMachines(id as string, machines as MachineType[]);
 
             res.json({
                 success: true,
@@ -131,7 +131,7 @@ export class AuthController {
         try {
             const { id } = req.params;
 
-            const result = await authService.deactivateUser(id);
+            const result = await authService.deactivateUser(id as string);
 
             res.json({
                 success: true,

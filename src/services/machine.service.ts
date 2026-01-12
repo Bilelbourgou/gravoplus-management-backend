@@ -1,7 +1,6 @@
 import prisma from '../config/database';
 import { MachineType } from '../types';
 import { ApiError } from '../middleware';
-import { Decimal } from '@prisma/client/runtime/library';
 
 export class MachineService {
     /**
@@ -20,12 +19,12 @@ export class MachineService {
         return prisma.machinePricing.upsert({
             where: { machineType },
             update: {
-                pricePerUnit: new Decimal(pricePerUnit),
+                pricePerUnit,
                 description,
             },
             create: {
                 machineType,
-                pricePerUnit: new Decimal(pricePerUnit),
+                pricePerUnit,
                 description,
             },
         });
@@ -59,7 +58,7 @@ export class MachineService {
                 update: {},
                 create: {
                     machineType: pricing.machineType,
-                    pricePerUnit: new Decimal(pricing.pricePerUnit),
+                    pricePerUnit: pricing.pricePerUnit,
                     description: pricing.description,
                 },
             });
@@ -82,7 +81,7 @@ export class FixedServicesService {
         return prisma.fixedService.create({
             data: {
                 name,
-                price: new Decimal(price),
+                price,
                 description,
             },
         });
@@ -99,7 +98,7 @@ export class FixedServicesService {
             where: { id },
             data: {
                 ...(data.name && { name: data.name }),
-                ...(data.price !== undefined && { price: new Decimal(data.price) }),
+                ...(data.price !== undefined && { price: data.price }),
                 ...(data.description !== undefined && { description: data.description }),
             },
         });
@@ -134,7 +133,7 @@ export class MaterialService {
         return prisma.material.create({
             data: {
                 name,
-                pricePerUnit: new Decimal(pricePerUnit),
+                pricePerUnit,
                 unit,
                 description,
             },
@@ -152,7 +151,7 @@ export class MaterialService {
             where: { id },
             data: {
                 ...(data.name && { name: data.name }),
-                ...(data.pricePerUnit !== undefined && { pricePerUnit: new Decimal(data.pricePerUnit) }),
+                ...(data.pricePerUnit !== undefined && { pricePerUnit: data.pricePerUnit }),
                 ...(data.unit && { unit: data.unit }),
                 ...(data.description !== undefined && { description: data.description }),
             },

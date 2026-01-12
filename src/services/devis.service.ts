@@ -1,4 +1,4 @@
-import { Decimal } from '@prisma/client/runtime/library';
+
 import prisma from '../config/database';
 import { CreateDevisDto, AddDevisLineDto, AddDevisServiceDto, DevisStatus, UserRole } from '../types';
 import { ApiError } from '../middleware';
@@ -179,12 +179,12 @@ export class DevisService {
                 devisId,
                 machineType: data.machineType,
                 description: data.description,
-                minutes: data.minutes ? new Decimal(data.minutes) : null,
-                meters: data.meters ? new Decimal(data.meters) : null,
+                minutes: data.minutes ?? null,
+                meters: data.meters ?? null,
                 quantity: data.quantity,
-                unitPrice: new Decimal(calculation.unitPrice),
-                materialCost: new Decimal(calculation.materialCost),
-                lineTotal: new Decimal(calculation.lineTotal),
+                unitPrice: calculation.unitPrice,
+                materialCost: calculation.materialCost,
+                lineTotal: calculation.lineTotal,
                 materialId: data.materialId,
             },
             include: {

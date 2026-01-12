@@ -1,4 +1,4 @@
-import { Decimal } from '@prisma/client/runtime/library';
+
 import prisma from '../config/database';
 import { CalculationInput, CalculationResult, MachineType } from '../types';
 import { ApiError } from '../middleware';
@@ -120,7 +120,7 @@ export class CalculationService {
         // Update devis total
         await prisma.devis.update({
             where: { id: devisId },
-            data: { totalAmount: new Decimal(total) },
+            data: { totalAmount: total },
         });
 
         return Math.round(total * 100) / 100;

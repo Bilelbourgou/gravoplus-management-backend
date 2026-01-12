@@ -100,7 +100,7 @@ export class FixedServiceController {
             const { id } = req.params;
             const { name, price, description } = req.body;
 
-            const service = await fixedServicesService.update(id, { name, price, description });
+            const service = await fixedServicesService.update(id as string, { name, price, description });
 
             res.json({
                 success: true,
@@ -115,7 +115,7 @@ export class FixedServiceController {
         try {
             const { id } = req.params;
 
-            await fixedServicesService.deactivate(id);
+            await fixedServicesService.deactivate(id as string);
 
             res.json({
                 success: true,
@@ -169,7 +169,7 @@ export class MaterialController {
             const { id } = req.params;
             const { name, pricePerUnit, unit, description } = req.body;
 
-            const material = await materialService.update(id, { name, pricePerUnit, unit, description });
+            const material = await materialService.update(id as string, { name, pricePerUnit, unit, description });
 
             res.json({
                 success: true,
@@ -184,7 +184,7 @@ export class MaterialController {
         try {
             const { id } = req.params;
 
-            await materialService.deactivate(id);
+            await materialService.deactivate(id as string);
 
             res.json({
                 success: true,

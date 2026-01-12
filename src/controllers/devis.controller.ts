@@ -30,7 +30,7 @@ export class DevisController {
     async getById(req: Request, res: Response, next: NextFunction) {
         try {
             const { id } = req.params;
-            const devis = await devisService.getDevisById(id);
+            const devis = await devisService.getDevisById(id as string);
 
             res.json({
                 success: true,
@@ -81,7 +81,7 @@ export class DevisController {
             }
 
             const result = await devisService.addLine(
-                id,
+                id as string,
                 req.user!.id,
                 req.user!.role as UserRole,
                 {
@@ -107,7 +107,7 @@ export class DevisController {
         try {
             const { id, lineId } = req.params;
 
-            const result = await devisService.removeLine(id, lineId);
+            const result = await devisService.removeLine(id as string, lineId as string);
 
             res.json({
                 success: true,
@@ -131,7 +131,7 @@ export class DevisController {
                 return;
             }
 
-            const result = await devisService.addService(id, { serviceId });
+            const result = await devisService.addService(id as string, { serviceId });
 
             res.status(201).json({
                 success: true,
@@ -146,7 +146,7 @@ export class DevisController {
         try {
             const { id, serviceId } = req.params;
 
-            const result = await devisService.removeService(id, serviceId);
+            const result = await devisService.removeService(id as string, serviceId as string);
 
             res.json({
                 success: true,
@@ -190,7 +190,7 @@ export class DevisController {
         try {
             const { id } = req.params;
 
-            const devis = await devisService.validateDevis(id);
+            const devis = await devisService.validateDevis(id as string);
 
             res.json({
                 success: true,
@@ -205,7 +205,7 @@ export class DevisController {
         try {
             const { id } = req.params;
 
-            const devis = await devisService.cancelDevis(id);
+            const devis = await devisService.cancelDevis(id as string);
 
             res.json({
                 success: true,
@@ -221,7 +221,7 @@ export class DevisController {
             const { id } = req.params;
             const { notes } = req.body;
 
-            const devis = await devisService.updateNotes(id, notes);
+            const devis = await devisService.updateNotes(id as string, notes);
 
             res.json({
                 success: true,

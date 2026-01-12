@@ -1,0 +1,27 @@
+import { Router } from 'express';
+import authRoutes from './auth.routes';
+import userRoutes from './user.routes';
+import clientRoutes from './client.routes';
+import devisRoutes from './devis.routes';
+import invoiceRoutes from './invoice.routes';
+import machineRoutes from './machine.routes';
+import serviceRoutes from './service.routes';
+import materialRoutes from './material.routes';
+
+const router = Router();
+
+router.use('/auth', authRoutes);
+router.use('/users', userRoutes);
+router.use('/clients', clientRoutes);
+router.use('/devis', devisRoutes);
+router.use('/invoices', invoiceRoutes);
+router.use('/machines', machineRoutes);
+router.use('/services', serviceRoutes);
+router.use('/materials', materialRoutes);
+
+// Health check
+router.get('/health', (_req, res) => {
+    res.json({ status: 'ok', timestamp: new Date().toISOString() });
+});
+
+export default router;
