@@ -66,6 +66,7 @@ export class DevisService {
                 createdBy: {
                     select: { id: true, firstName: true, lastName: true },
                 },
+                invoice: true,
                 _count: {
                     select: { lines: true, services: true },
                 },
