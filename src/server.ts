@@ -28,7 +28,7 @@ app.set('io', io);
 // Middleware
 app.use(helmet());
 app.use(cors({
-    origin: config.env === 'development' ? true : config.cors.origin,
+    origin: '*',
     credentials: true,
 }));
 app.use(express.json());
