@@ -23,45 +23,70 @@ export class InvoiceService {
     }
 
     /**
-     * Convert devis to invoice
+     * Convert devis to invoice (supports multiple devis)
      */
-    async createInvoiceFromDevis(devisId: string) {
-        const devis = await prisma.devis.findUnique({
-            where: { id: devisId },
+    async createInvoiceFromDevis(devisIds: string | string[]) {
+        const ids = Array.isArray(devisIds) ? devisIds : [devisIds];
+
+        if (ids.length === 0) {
+            throw new ApiError(400, 'At least one devis is required');
+        }
+
+        // Fetch all devis
+        const devisList = await prisma.devis.findMany({
+            where: { id: { in: ids } },
             include: {
                 client: true,
-                lines: { include: { material: true } },
-                services: { include: { service: true } },
                 invoice: true,
             },
         });
 
-        if (!devis) {
-            throw new ApiError(404, 'Devis not found');
+        if (devisList.length !== ids.length) {
+            throw new ApiError(404, 'One or more devis not found');
         }
 
-        if (devis.status !== DevisStatus.VALIDATED) {
-            throw new ApiError(400, 'Devis must be validated before creating an invoice');
+        // Validate all devis belong to same client
+        const clientIds = [...new Set(devisList.map(d => d.clientId))];
+        if (clientIds.length > 1) {
+            throw new ApiError(400, 'All devis must belong to the same client');
         }
 
-        if (devis.invoice) {
-            throw new ApiError(400, 'Invoice already exists for this devis');
+        // Validate all devis are VALIDATED
+        const nonValidated = devisList.filter(d => d.status !== DevisStatus.VALIDATED);
+        if (nonValidated.length > 0) {
+            throw new ApiError(400, 'All devis must be validated before creating an invoice');
+        }
+
+        // Check if any devis already has an invoice
+        const alreadyInvoiced = devisList.filter(d => d.invoiceId);
+        if (alreadyInvoiced.length > 0) {
+            throw new ApiError(400, 'One or more devis already have an invoice');
         }
 
         const reference = await this.generateReference();
+        const clientId = clientIds[0];
+        const totalAmount = devisList.reduce((sum, d) => sum + Number(d.totalAmount), 0);
 
-        // Create invoice
-        const invoice = await prisma.invoice.create({
-            data: {
-                reference,
-                devisId,
-            },
-        });
+        // Create invoice and update all devis in a transaction
+        const invoice = await prisma.$transaction(async (tx) => {
+            const newInvoice = await tx.invoice.create({
+                data: {
+                    reference,
+                    clientId,
+                    totalAmount,
+                },
+            });
 
-        // Update devis status
-        await prisma.devis.update({
-            where: { id: devisId },
-            data: { status: DevisStatus.INVOICED },
+            // Update all devis to link to invoice and set status
+            await tx.devis.updateMany({
+                where: { id: { in: ids } },
+                data: {
+                    status: DevisStatus.INVOICED,
+                    invoiceId: newInvoice.id,
+                },
+            });
+
+            return newInvoice;
         });
 
         return invoice;
@@ -74,9 +99,9 @@ export class InvoiceService {
         const invoice = await prisma.invoice.findUnique({
             where: { id: invoiceId },
             include: {
+                client: true,
                 devis: {
                     include: {
-                        client: true,
                         lines: { include: { material: true } },
                         services: { include: { service: true } },
                         createdBy: {
@@ -91,7 +116,7 @@ export class InvoiceService {
             throw new ApiError(404, 'Invoice not found');
         }
 
-        const { devis } = invoice;
+        const { devis: devisList, client } = invoice;
 
         return new Promise((resolve, reject) => {
             const doc = new PDFDocument({ margin: 50 });
@@ -109,16 +134,16 @@ export class InvoiceService {
             doc.fontSize(12).font('Helvetica');
             doc.text(`N° Facture: ${invoice.reference}`);
             doc.text(`Date: ${invoice.createdAt.toLocaleDateString('fr-FR')}`);
-            doc.text(`N° Devis: ${devis.reference}`);
+            doc.text(`N° Devis: ${devisList.map(d => d.reference).join(', ')}`);
             doc.moveDown();
 
             // Client info
             doc.font('Helvetica-Bold').text('Client:');
             doc.font('Helvetica');
-            doc.text(devis.client.name);
-            if (devis.client.phone) doc.text(`Tél: ${devis.client.phone}`);
-            if (devis.client.email) doc.text(`Email: ${devis.client.email}`);
-            if (devis.client.address) doc.text(`Adresse: ${devis.client.address}`);
+            doc.text(client.name);
+            if (client.phone) doc.text(`Tél: ${client.phone}`);
+            if (client.email) doc.text(`Email: ${client.email}`);
+            if (client.address) doc.text(`Adresse: ${client.address}`);
             doc.moveDown();
 
             // Line items
@@ -138,29 +163,45 @@ export class InvoiceService {
             let y = tableTop + 25;
             doc.font('Helvetica').fontSize(10);
 
-            // Lines
-            for (const line of devis.lines) {
-                const desc = `${line.machineType}${line.description ? ` - ${line.description}` : ''}`;
-                const qty = line.minutes ? `${line.minutes} min` :
-                    line.meters ? `${line.meters} m` :
-                        `${line.quantity} unités`;
+            // Loop through each devis
+            for (const devis of devisList) {
+                // Devis header
+                if (devisList.length > 1) {
+                    doc.font('Helvetica-Bold').fontSize(10);
+                    doc.text(`Devis: ${devis.reference}`, 50, y);
+                    y += 18;
+                    doc.font('Helvetica').fontSize(10);
+                }
 
-                doc.text(desc, 50, y, { width: 240 });
-                doc.text(qty, 300, y);
-                doc.text(`${Number(line.unitPrice).toFixed(2)} TND`, 380, y);
-                doc.text(`${Number(line.lineTotal).toFixed(2)} TND`, 460, y);
+                // Lines
+                for (const line of devis.lines) {
+                    const desc = `${line.machineType}${line.description ? ` - ${line.description}` : ''}`;
+                    const qty = line.minutes ? `${line.minutes} min` :
+                        line.meters ? `${line.meters} m` :
+                            `${line.quantity} unités`;
 
-                y += 20;
-            }
+                    doc.text(desc, 50, y, { width: 240 });
+                    doc.text(qty, 300, y);
+                    doc.text(`${Number(line.unitPrice).toFixed(2)} TND`, 380, y);
+                    doc.text(`${Number(line.lineTotal).toFixed(2)} TND`, 460, y);
 
-            // Services
-            for (const ds of devis.services) {
-                doc.text(ds.service.name, 50, y);
-                doc.text('1', 300, y);
-                doc.text(`${Number(ds.price).toFixed(2)} TND`, 380, y);
-                doc.text(`${Number(ds.price).toFixed(2)} TND`, 460, y);
+                    y += 20;
+                }
 
-                y += 20;
+                // Services
+                for (const ds of devis.services) {
+                    doc.text(ds.service.name, 50, y);
+                    doc.text('1', 300, y);
+                    doc.text(`${Number(ds.price).toFixed(2)} TND`, 380, y);
+                    doc.text(`${Number(ds.price).toFixed(2)} TND`, 460, y);
+
+                    y += 20;
+                }
+
+                // Add spacing between devis if multiple
+                if (devisList.length > 1) {
+                    y += 10;
+                }
             }
 
             // Total
@@ -169,7 +210,7 @@ export class InvoiceService {
 
             doc.font('Helvetica-Bold').fontSize(14);
             doc.text('TOTAL:', 380, y);
-            doc.text(`${Number(devis.totalAmount).toFixed(2)} TND`, 460, y);
+            doc.text(`${Number(invoice.totalAmount).toFixed(2)} TND`, 460, y);
 
             // Footer
             doc.fontSize(10).font('Helvetica');
@@ -191,11 +232,14 @@ export class InvoiceService {
         return prisma.invoice.findMany({
             orderBy: { createdAt: 'desc' },
             include: {
+                client: {
+                    select: { id: true, name: true },
+                },
                 devis: {
-                    include: {
-                        client: {
-                            select: { id: true, name: true },
-                        },
+                    select: {
+                        id: true,
+                        reference: true,
+                        totalAmount: true,
                     },
                 },
             },
@@ -209,11 +253,14 @@ export class InvoiceService {
         const invoice = await prisma.invoice.findUnique({
             where: { id: invoiceId },
             include: {
+                client: true,
                 devis: {
                     include: {
-                        client: true,
                         lines: { include: { material: true } },
                         services: { include: { service: true } },
+                        createdBy: {
+                            select: { id: true, firstName: true, lastName: true },
+                        },
                     },
                 },
             },

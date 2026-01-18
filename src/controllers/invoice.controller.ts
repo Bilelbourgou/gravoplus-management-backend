@@ -31,9 +31,20 @@ export class InvoiceController {
 
     async createFromDevis(req: Request, res: Response, next: NextFunction) {
         try {
+            // Support both single devisId from params (backward compatible) and devisIds from body
             const { devisId } = req.params;
+            const { devisIds } = req.body;
 
-            const invoice = await invoiceService.createInvoiceFromDevis(devisId as string);
+            const ids = devisIds || devisId;
+
+            if (!ids) {
+                return res.status(400).json({
+                    success: false,
+                    error: 'devisId or devisIds is required',
+                });
+            }
+
+            const invoice = await invoiceService.createInvoiceFromDevis(ids);
 
             res.status(201).json({
                 success: true,

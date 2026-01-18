@@ -55,6 +55,7 @@ model Client {
   
   // Relations
   devis       Devis[]
+  invoices    Invoice[]
   
   @@map("clients")
 }
@@ -119,7 +120,9 @@ model Devis {
   
   lines         DevisLine[]
   services      DevisService[]
-  invoice       Invoice?
+  
+  invoiceId     String?
+  invoice       Invoice?  @relation(fields: [invoiceId], references: [id])
   
   @@map("devis")
 }
@@ -168,12 +171,15 @@ model DevisService {
 model Invoice {
   id            String    @id @default(uuid())
   reference     String    @unique  // INV-2024-0001
+  totalAmount   Decimal   @default(0)  // Sum of all devis amounts
   pdfUrl        String?
   createdAt     DateTime  @default(now())
   
   // Relations
-  devisId       String    @unique
-  devis         Devis     @relation(fields: [devisId], references: [id])
+  clientId      String
+  client        Client    @relation(fields: [clientId], references: [id])
+  
+  devis         Devis[]
   payments      Payment[]
   
   @@map("invoices")
