@@ -35,7 +35,11 @@ export class PaymentService {
             (sum, p) => sum + Number(p.amount),
             0
         );
-        const totalAmount = Number(invoice.devis.totalAmount);
+        // Calculate total amount from all devis
+        const totalAmount = invoice.devis.reduce(
+            (sum, d) => sum + Number(d.totalAmount),
+            0
+        );
         const remaining = totalAmount - totalPaid;
 
         if (data.amount > remaining) {
@@ -122,7 +126,11 @@ export class PaymentService {
                 (sum, p) => sum + Number(p.amount),
                 0
             );
-            const totalAmount = Number(payment.invoice.devis.totalAmount);
+            // Calculate total amount from all devis
+            const totalAmount = payment.invoice.devis.reduce(
+                (sum, d) => sum + Number(d.totalAmount),
+                0
+            );
             const maxAllowed = totalAmount - totalOtherPayments;
 
             if (data.amount > maxAllowed) {
@@ -174,7 +182,11 @@ export class PaymentService {
             throw new ApiError(404, 'Invoice not found');
         }
 
-        const totalAmount = Number(invoice.devis.totalAmount);
+        // Calculate total amount from all devis
+        const totalAmount = invoice.devis.reduce(
+            (sum, d) => sum + Number(d.totalAmount),
+            0
+        );
         const totalPaid = invoice.payments.reduce(
             (sum, p) => sum + Number(p.amount),
             0

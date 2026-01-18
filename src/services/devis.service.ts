@@ -118,6 +118,15 @@ export class DevisService {
             throw new ApiError(404, 'Client not found');
         }
 
+        // Verify user exists
+        const user = await prisma.user.findUnique({
+            where: { id: userId },
+        });
+
+        if (!user) {
+            throw new ApiError(401, 'User session expired. Please log in again.');
+        }
+
         const reference = await this.generateReference();
 
         return prisma.devis.create({
@@ -334,7 +343,7 @@ export class DevisService {
     }
 
     /**
-     * Cancel devis (Admin only)
+     * Cancel a devis
      */
     async cancelDevis(devisId: string) {
         const devis = await prisma.devis.findUnique({
@@ -351,8 +360,46 @@ export class DevisService {
 
         return prisma.devis.update({
             where: { id: devisId },
-            data: { status: DevisStatus.CANCELLED },
+            data: {
+                status: DevisStatus.CANCELLED,
+            },
         });
+    }
+
+    /**
+     * Delete a devis
+     */
+    async deleteDevis(devisId: string) {
+        const devis = await prisma.devis.findUnique({
+            where: { id: devisId },
+            include: {
+                invoice: true,
+            },
+        });
+
+        if (!devis) {
+            throw new ApiError(404, 'Devis not found');
+        }
+
+        if (devis.status === DevisStatus.INVOICED || devis.invoice) {
+            throw new ApiError(400, 'Cannot delete an invoiced devis');
+        }
+
+        // Delete associated lines and services first
+        await prisma.devisLine.deleteMany({
+            where: { devisId },
+        });
+
+        await prisma.devisService.deleteMany({
+            where: { devisId },
+        });
+
+        // Delete the devis
+        await prisma.devis.delete({
+            where: { id: devisId },
+        });
+
+        return { success: true, message: 'Devis deleted successfully' };
     }
 
     /**

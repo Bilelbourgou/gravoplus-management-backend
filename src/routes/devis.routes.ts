@@ -27,5 +27,6 @@ router.patch('/:id/notes', isEmployeeOrAdmin, devisController.updateNotes.bind(d
 // Admin only routes
 router.post('/:id/validate', isAdmin, devisController.validate.bind(devisController));
 router.post('/:id/cancel', isAdmin, devisController.cancel.bind(devisController));
+router.delete('/:id', isAdmin, devisController.delete.bind(devisController));
 
 export default router;

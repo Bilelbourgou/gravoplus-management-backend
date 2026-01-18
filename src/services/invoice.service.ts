@@ -272,6 +272,47 @@ export class InvoiceService {
 
         return invoice;
     }
+
+    /**
+     * Delete an invoice
+     */
+    async deleteInvoice(invoiceId: string) {
+        const invoice = await prisma.invoice.findUnique({
+            where: { id: invoiceId },
+            include: {
+                payments: true,
+                devis: true,
+            },
+        });
+
+        if (!invoice) {
+            throw new ApiError(404, 'Invoice not found');
+        }
+
+        // Cannot delete invoice if it has payments
+        if (invoice.payments && invoice.payments.length > 0) {
+            throw new ApiError(400, 'Cannot delete an invoice with payments. Delete all payments first.');
+        }
+
+        // Delete invoice and reset associated devis in a transaction
+        await prisma.$transaction(async (tx) => {
+            // Reset devis status back to VALIDATED and remove invoice link
+            await tx.devis.updateMany({
+                where: { invoiceId },
+                data: {
+                    invoiceId: null,
+                    status: DevisStatus.VALIDATED,
+                },
+            });
+
+            // Delete the invoice
+            await tx.invoice.delete({
+                where: { id: invoiceId },
+            });
+        });
+
+        return { success: true, message: 'Invoice deleted successfully' };
+    }
 }
 
 export const invoiceService = new InvoiceService();

@@ -116,18 +116,61 @@ async function main() {
         { name: 'Mohamed Ben Salem', phone: '+216 98 765 432' },
     ];
 
+    const createdClients = [];
     for (const client of clients) {
-        const existing = await prisma.client.findFirst({ where: { name: client.name } });
+        let existing = await prisma.client.findFirst({ where: { name: client.name } });
         if (!existing) {
-            await prisma.client.create({ data: client });
+            existing = await prisma.client.create({ data: client });
         }
+        createdClients.push(existing);
     }
     console.log('✅ Sample clients created');
+
+    // Create sample validated devis for the same client (to test multi-devis invoice feature)
+    const testClient = createdClients[0]; // Entreprise ABC
+    
+    // Create 3 validated devis for the same client
+    for (let i = 1; i <= 3; i++) {
+        const devis = await prisma.devis.create({
+            data: {
+                reference: `DEV-2025-000${i}`,
+                clientId: testClient.id,
+                createdById: employee.id,
+                status: 'VALIDATED',
+                validatedAt: new Date(),
+                notes: `Devis de test ${i} pour démonstration multi-devis`,
+            },
+        });
+
+        // Add a sample line to each devis
+        await prisma.devisLine.create({
+            data: {
+                devisId: devis.id,
+                machineType: i === 1 ? 'CNC' : i === 2 ? 'LASER' : 'PANNEAUX',
+                description: `Travail ${i === 1 ? 'CNC' : i === 2 ? 'Laser' : 'Panneaux'}`,
+                minutes: i === 1 || i === 2 ? 30 * i : undefined,
+                quantity: i === 3 ? 2 : undefined,
+                unitPrice: i === 1 ? 1.5 : i === 2 ? 2.0 : 25.0,
+                materialCost: 50 * i,
+                lineTotal: (i === 1 ? 45 : i === 2 ? 60 : 50) + (50 * i),
+            },
+        });
+
+        // Update devis total
+        const totalAmount = (i === 1 ? 45 : i === 2 ? 60 : 50) + (50 * i);
+        await prisma.devis.update({
+            where: { id: devis.id },
+            data: { totalAmount },
+        });
+    }
+    console.log('✅ Sample validated devis created for testing');
 
     console.log('\n🎉 Seed completed successfully!');
     console.log('\n📌 Login credentials:');
     console.log('   Admin: username=admin, password=admin123');
     console.log('   Employee: username=employee, password=employee123');
+    console.log('\n💡 Test feature: 3 validated devis created for "Entreprise ABC"');
+    console.log('   Go to Devis page to see "Créer facture (3)" button');
 }
 
 main()

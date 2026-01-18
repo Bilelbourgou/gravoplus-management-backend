@@ -33,7 +33,7 @@ export class InvoiceController {
         try {
             // Support both single devisId from params (backward compatible) and devisIds from body
             const { devisId } = req.params;
-            const { devisIds } = req.body;
+            const devisIds = req.body?.devisIds;
 
             const ids = devisIds || devisId;
 
@@ -68,6 +68,21 @@ export class InvoiceController {
                 `attachment; filename="${invoice.reference}.pdf"`
             );
             res.send(pdfBuffer);
+        } catch (error) {
+            next(error);
+        }
+    }
+
+    async delete(req: Request, res: Response, next: NextFunction) {
+        try {
+            const { id } = req.params;
+
+            const result = await invoiceService.deleteInvoice(id as string);
+
+            res.json({
+                success: true,
+                data: result,
+            });
         } catch (error) {
             next(error);
         }

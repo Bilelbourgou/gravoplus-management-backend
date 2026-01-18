@@ -231,6 +231,21 @@ export class DevisController {
             next(error);
         }
     }
+
+    async delete(req: Request, res: Response, next: NextFunction) {
+        try {
+            const { id } = req.params;
+
+            const result = await devisService.deleteDevis(id as string);
+
+            res.json({
+                success: true,
+                data: result,
+            });
+        } catch (error) {
+            next(error);
+        }
+    }
 }
 
 export const devisController = new DevisController();

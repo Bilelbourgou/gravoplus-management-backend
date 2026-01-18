@@ -10,7 +10,9 @@ router.use(authenticate);
 // Admin only routes
 router.get('/', isAdmin, invoiceController.getAll.bind(invoiceController));
 router.get('/:id', isAdmin, invoiceController.getById.bind(invoiceController));
+router.post('/from-devis', isAdmin, invoiceController.createFromDevis.bind(invoiceController));
 router.post('/from-devis/:devisId', isAdmin, invoiceController.createFromDevis.bind(invoiceController));
 router.get('/:id/pdf', isAdmin, invoiceController.downloadPDF.bind(invoiceController));
+router.delete('/:id', isAdmin, invoiceController.delete.bind(invoiceController));
 
 export default router;
