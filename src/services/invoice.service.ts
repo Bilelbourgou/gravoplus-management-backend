@@ -3,6 +3,12 @@ import prisma from '../config/database';
 import { ApiError } from '../middleware';
 import { DevisStatus } from '../types';
 
+interface InvoiceItemInput {
+    description: string;
+    quantity: number;
+    unitPrice: number;
+}
+
 
 export class InvoiceService {
     /**
@@ -20,6 +26,54 @@ export class InvoiceService {
 
         const number = (count + 1).toString().padStart(4, '0');
         return `INV-${year}-${number}`;
+    }
+
+    /**
+     * Create invoice directly with custom items (no devis required)
+     */
+    async createDirectInvoice(clientId: string, items: InvoiceItemInput[]) {
+        if (!items || items.length === 0) {
+            throw new ApiError(400, 'At least one item is required');
+        }
+
+        // Validate client exists
+        const client = await prisma.client.findUnique({
+            where: { id: clientId },
+        });
+
+        if (!client) {
+            throw new ApiError(404, 'Client not found');
+        }
+
+        const reference = await this.generateReference();
+        const totalAmount = items.reduce((sum, item) => sum + (item.quantity * item.unitPrice), 0);
+
+        // Create invoice with items in a transaction
+        const invoice = await prisma.$transaction(async (tx) => {
+            const newInvoice = await tx.invoice.create({
+                data: {
+                    reference,
+                    clientId,
+                    totalAmount,
+                    items: {
+                        create: items.map(item => ({
+                            description: item.description,
+                            quantity: item.quantity,
+                            unitPrice: item.unitPrice,
+                            totalPrice: item.quantity * item.unitPrice,
+                        })),
+                    },
+                },
+                include: {
+                    items: true,
+                    client: true,
+                },
+            });
+
+            return newInvoice;
+        });
+
+        return invoice;
     }
 
     /**
@@ -254,6 +308,7 @@ export class InvoiceService {
             where: { id: invoiceId },
             include: {
                 client: true,
+                items: true,
                 devis: {
                     include: {
                         lines: { include: { material: true } },

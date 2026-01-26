@@ -171,7 +171,7 @@ model DevisService {
 model Invoice {
   id            String    @id @default(uuid())
   reference     String    @unique  // INV-2024-0001
-  totalAmount   Decimal   @default(0)  // Sum of all devis amounts
+  totalAmount   Decimal   @default(0)  // Sum of all devis amounts or items
   pdfUrl        String?
   createdAt     DateTime  @default(now())
   
@@ -180,9 +180,25 @@ model Invoice {
   client        Client    @relation(fields: [clientId], references: [id])
   
   devis         Devis[]
+  items         InvoiceItem[]
   payments      Payment[]
   
   @@map("invoices")
+}
+
+model InvoiceItem {
+  id            String    @id @default(uuid())
+  description   String
+  quantity      Decimal   @default(1)
+  unitPrice     Decimal
+  totalPrice    Decimal
+  createdAt     DateTime  @default(now())
+  
+  // Relations
+  invoiceId     String
+  invoice       Invoice   @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  
+  @@map("invoice_items")
 }
 
 model Payment {

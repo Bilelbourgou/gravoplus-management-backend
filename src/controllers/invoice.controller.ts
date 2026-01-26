@@ -29,6 +29,28 @@ export class InvoiceController {
         }
     }
 
+    async createDirect(req: Request, res: Response, next: NextFunction) {
+        try {
+            const { clientId, items } = req.body;
+
+            if (!clientId || !items) {
+                return res.status(400).json({
+                    success: false,
+                    error: 'clientId and items are required',
+                });
+            }
+
+            const invoice = await invoiceService.createDirectInvoice(clientId, items);
+
+            res.status(201).json({
+                success: true,
+                data: invoice,
+            });
+        } catch (error) {
+            next(error);
+        }
+    }
+
     async createFromDevis(req: Request, res: Response, next: NextFunction) {
         try {
             // Support both single devisId from params (backward compatible) and devisIds from body

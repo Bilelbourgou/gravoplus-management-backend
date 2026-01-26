@@ -116,6 +116,20 @@ export class ClientController {
             next(error);
         }
     }
+
+    async getBalance(req: Request, res: Response, next: NextFunction) {
+        try {
+            const { id } = req.params;
+            const balanceData = await clientService.getClientBalance(id as string);
+
+            res.json({
+                success: true,
+                data: balanceData,
+            });
+        } catch (error) {
+            next(error);
+        }
+    }
 }
 
 export const clientController = new ClientController();

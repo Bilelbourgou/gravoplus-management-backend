@@ -11,6 +11,7 @@ router.use(authenticate);
 router.get('/', isEmployeeOrAdmin, clientController.getAll.bind(clientController));
 router.get('/search', isEmployeeOrAdmin, clientController.search.bind(clientController));
 router.get('/:id', isEmployeeOrAdmin, clientController.getById.bind(clientController));
+router.get('/:id/balance', isEmployeeOrAdmin, clientController.getBalance.bind(clientController));
 
 // Admin only routes
 router.post('/', isAdmin, clientController.create.bind(clientController));

@@ -131,46 +131,143 @@ async function main() {
     
     // Create 3 validated devis for the same client
     for (let i = 1; i <= 3; i++) {
-        const devis = await prisma.devis.create({
-            data: {
-                reference: `DEV-2025-000${i}`,
+        const reference = `DEV-2025-000${i}`;
+        const totalAmount = (i === 1 ? 45 : i === 2 ? 60 : 50) + (50 * i);
+        
+        const devis = await prisma.devis.upsert({
+            where: { reference },
+            update: {},
+            create: {
+                reference,
                 clientId: testClient.id,
                 createdById: employee.id,
                 status: 'VALIDATED',
                 validatedAt: new Date(),
                 notes: `Devis de test ${i} pour démonstration multi-devis`,
+                totalAmount,
             },
         });
 
-        // Add a sample line to each devis
-        await prisma.devisLine.create({
-            data: {
-                devisId: devis.id,
-                machineType: i === 1 ? 'CNC' : i === 2 ? 'LASER' : 'PANNEAUX',
-                description: `Travail ${i === 1 ? 'CNC' : i === 2 ? 'Laser' : 'Panneaux'}`,
-                minutes: i === 1 || i === 2 ? 30 * i : undefined,
-                quantity: i === 3 ? 2 : undefined,
-                unitPrice: i === 1 ? 1.5 : i === 2 ? 2.0 : 25.0,
-                materialCost: 50 * i,
-                lineTotal: (i === 1 ? 45 : i === 2 ? 60 : 50) + (50 * i),
-            },
+        // Check if devis line already exists before creating
+        const existingLine = await prisma.devisLine.findFirst({
+            where: { devisId: devis.id },
         });
 
-        // Update devis total
-        const totalAmount = (i === 1 ? 45 : i === 2 ? 60 : 50) + (50 * i);
-        await prisma.devis.update({
-            where: { id: devis.id },
-            data: { totalAmount },
-        });
+        if (!existingLine) {
+            await prisma.devisLine.create({
+                data: {
+                    devisId: devis.id,
+                    machineType: i === 1 ? 'CNC' : i === 2 ? 'LASER' : 'PANNEAUX',
+                    description: `Travail ${i === 1 ? 'CNC' : i === 2 ? 'Laser' : 'Panneaux'}`,
+                    minutes: i === 1 || i === 2 ? 30 * i : undefined,
+                    quantity: i === 3 ? 2 : undefined,
+                    unitPrice: i === 1 ? 1.5 : i === 2 ? 2.0 : 25.0,
+                    materialCost: 50 * i,
+                    lineTotal: (i === 1 ? 45 : i === 2 ? 60 : 50) + (50 * i),
+                },
+            });
+        }
     }
     console.log('✅ Sample validated devis created for testing');
+
+    // Create sample invoices with payments for balance testing
+    const clientForInvoice = createdClients[0]; // Entreprise ABC
+
+    // Create first invoice from devis
+    const invoice1 = await prisma.invoice.upsert({
+        where: { reference: 'INV-2025-0001' },
+        update: {},
+        create: {
+            reference: 'INV-2025-0001',
+            clientId: clientForInvoice.id,
+            totalAmount: 300,
+        },
+    });
+
+    // Add payments to first invoice (partial payment)
+    const payment1 = await prisma.payment.findFirst({
+        where: { invoiceId: invoice1.id, reference: 'CHQ-001' },
+    });
+    if (!payment1) {
+        await prisma.payment.create({
+            data: {
+                invoiceId: invoice1.id,
+                amount: 150,
+                paymentDate: new Date('2025-01-15'),
+                paymentMethod: 'Chèque',
+                reference: 'CHQ-001',
+                notes: 'Premier paiement partiel',
+            },
+        });
+    }
+
+    const payment2 = await prisma.payment.findFirst({
+        where: { invoiceId: invoice1.id, reference: 'CASH-001' },
+    });
+    if (!payment2) {
+        await prisma.payment.create({
+            data: {
+                invoiceId: invoice1.id,
+                amount: 100,
+                paymentDate: new Date('2025-01-20'),
+                paymentMethod: 'Espèces',
+                reference: 'CASH-001',
+                notes: 'Deuxième paiement',
+            },
+        });
+    }
+
+    // Create second invoice (fully paid)
+    const invoice2 = await prisma.invoice.upsert({
+        where: { reference: 'INV-2025-0002' },
+        update: {},
+        create: {
+            reference: 'INV-2025-0002',
+            clientId: clientForInvoice.id,
+            totalAmount: 500,
+        },
+    });
+
+    const payment3 = await prisma.payment.findFirst({
+        where: { invoiceId: invoice2.id, reference: 'VIR-001' },
+    });
+    if (!payment3) {
+        await prisma.payment.create({
+            data: {
+                invoiceId: invoice2.id,
+                amount: 500,
+                paymentDate: new Date('2025-01-22'),
+                paymentMethod: 'Virement bancaire',
+                reference: 'VIR-001',
+                notes: 'Paiement complet',
+            },
+        });
+    }
+
+    // Create third invoice (no payment yet)
+    await prisma.invoice.upsert({
+        where: { reference: 'INV-2025-0003' },
+        update: {},
+        create: {
+            reference: 'INV-2025-0003',
+            clientId: clientForInvoice.id,
+            totalAmount: 450,
+        },
+    });
+
+    console.log('✅ Sample invoices and payments created for balance testing');
 
     console.log('\n🎉 Seed completed successfully!');
     console.log('\n📌 Login credentials:');
     console.log('   Admin: username=admin, password=admin123');
     console.log('   Employee: username=employee, password=employee123');
-    console.log('\n💡 Test feature: 3 validated devis created for "Entreprise ABC"');
-    console.log('   Go to Devis page to see "Créer facture (3)" button');
+    console.log('\n💡 Test features:');
+    console.log('   - 3 validated devis for "Entreprise ABC"');
+    console.log('   - 3 invoices with various payment statuses:');
+    console.log('     • INV-2025-0001: 300 TND (250 TND paid, 50 TND remaining)');
+    console.log('     • INV-2025-0002: 500 TND (fully paid)');
+    console.log('     • INV-2025-0003: 450 TND (not paid)');
+    console.log('   - Total outstanding balance: 500 TND');
 }
 
 main()

@@ -35,11 +35,8 @@ export class PaymentService {
             (sum, p) => sum + Number(p.amount),
             0
         );
-        // Calculate total amount from all devis
-        const totalAmount = invoice.devis.reduce(
-            (sum, d) => sum + Number(d.totalAmount),
-            0
-        );
+        // Use invoice.totalAmount directly (works for both devis-based and direct invoices)
+        const totalAmount = Number(invoice.totalAmount);
         const remaining = totalAmount - totalPaid;
 
         if (data.amount > remaining) {
@@ -126,11 +123,8 @@ export class PaymentService {
                 (sum, p) => sum + Number(p.amount),
                 0
             );
-            // Calculate total amount from all devis
-            const totalAmount = payment.invoice.devis.reduce(
-                (sum, d) => sum + Number(d.totalAmount),
-                0
-            );
+            // Use invoice.totalAmount directly (works for both devis-based and direct invoices)
+            const totalAmount = Number(payment.invoice.totalAmount);
             const maxAllowed = totalAmount - totalOtherPayments;
 
             if (data.amount > maxAllowed) {
@@ -182,11 +176,8 @@ export class PaymentService {
             throw new ApiError(404, 'Invoice not found');
         }
 
-        // Calculate total amount from all devis
-        const totalAmount = invoice.devis.reduce(
-            (sum, d) => sum + Number(d.totalAmount),
-            0
-        );
+        // Use invoice.totalAmount directly (works for both devis-based and direct invoices)
+        const totalAmount = Number(invoice.totalAmount);
         const totalPaid = invoice.payments.reduce(
             (sum, p) => sum + Number(p.amount),
             0
@@ -202,7 +193,7 @@ export class PaymentService {
             remaining,
             percentPaid: Math.round(percentPaid * 100) / 100,
             paymentCount: invoice.payments.length,
-            isPaid: remaining === 0,
+            isPaid: remaining === 0 && totalAmount > 0,
         };
     }
 }
