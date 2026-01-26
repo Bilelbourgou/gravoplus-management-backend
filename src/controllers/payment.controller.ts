@@ -7,7 +7,7 @@ export class PaymentController {
             const { invoiceId } = req.params;
             const paymentData = req.body;
 
-            const payment = await paymentService.createPayment(invoiceId, paymentData);
+            const payment = await paymentService.createPayment(invoiceId as string, paymentData);
 
             res.status(201).json({
                 success: true,
@@ -22,7 +22,7 @@ export class PaymentController {
         try {
             const { invoiceId } = req.params;
 
-            const payments = await paymentService.getPaymentsByInvoice(invoiceId);
+            const payments = await paymentService.getPaymentsByInvoice(invoiceId as string);
 
             res.json({
                 success: true,
@@ -37,7 +37,7 @@ export class PaymentController {
         try {
             const { id } = req.params;
 
-            const payment = await paymentService.getPaymentById(id);
+            const payment = await paymentService.getPaymentById(id as string);
 
             res.json({
                 success: true,
@@ -53,7 +53,7 @@ export class PaymentController {
             const { id } = req.params;
             const paymentData = req.body;
 
-            const payment = await paymentService.updatePayment(id, paymentData);
+            const payment = await paymentService.updatePayment(id as string, paymentData);
 
             res.json({
                 success: true,
@@ -68,7 +68,7 @@ export class PaymentController {
         try {
             const { id } = req.params;
 
-            const result = await paymentService.deletePayment(id);
+            const result = await paymentService.deletePayment(id as string);
 
             res.json({
                 success: true,
@@ -83,7 +83,7 @@ export class PaymentController {
         try {
             const { invoiceId } = req.params;
 
-            const stats = await paymentService.getPaymentStats(invoiceId);
+            const stats = await paymentService.getPaymentStats(invoiceId as string);
 
             res.json({
                 success: true,
