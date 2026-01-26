@@ -1,6 +1,7 @@
 import prisma from '../config/database';
 import { CreateClientDto } from '../types';
 import { ApiError } from '../middleware';
+import { notificationService } from './notification.service';
 
 export class ClientService {
     /**
@@ -49,10 +50,22 @@ export class ClientService {
     /**
      * Create new client
      */
-    async createClient(data: CreateClientDto) {
-        return prisma.client.create({
+    async createClient(data: CreateClientDto, triggeredById?: string) {
+        const client = await prisma.client.create({
             data,
         });
+
+        // Create notification
+        await notificationService.create({
+            type: 'CLIENT_CREATED',
+            title: 'Nouveau client',
+            message: `Le client "${client.name}" a été créé`,
+            entityType: 'client',
+            entityId: client.id,
+            triggeredById,
+        });
+
+        return client;
     }
 
     /**

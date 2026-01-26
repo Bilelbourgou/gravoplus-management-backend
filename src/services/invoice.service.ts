@@ -2,6 +2,7 @@ import PDFDocument from 'pdfkit';
 import prisma from '../config/database';
 import { ApiError } from '../middleware';
 import { DevisStatus } from '../types';
+import { notificationService } from './notification.service';
 
 interface InvoiceItemInput {
     description: string;
@@ -73,6 +74,15 @@ export class InvoiceService {
             return newInvoice;
         });
 
+        // Create notification
+        await notificationService.create({
+            type: 'INVOICE_CREATED',
+            title: 'Nouvelle facture',
+            message: `Facture ${invoice.reference} créée pour ${client.name}`,
+            entityType: 'invoice',
+            entityId: invoice.id,
+        });
+
         return invoice;
     }
 
@@ -141,6 +151,18 @@ export class InvoiceService {
             });
 
             return newInvoice;
+        });
+
+        // Fetch client for notification
+        const client = await prisma.client.findUnique({ where: { id: clientId } });
+
+        // Create notification
+        await notificationService.create({
+            type: 'INVOICE_CREATED',
+            title: 'Nouvelle facture',
+            message: `Facture ${invoice.reference} créée pour ${client?.name || 'Client'}`,
+            entityType: 'invoice',
+            entityId: invoice.id,
         });
 
         return invoice;

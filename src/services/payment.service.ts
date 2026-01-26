@@ -1,5 +1,6 @@
 import prisma from '../config/database';
 import { ApiError } from '../middleware';
+import { notificationService } from './notification.service';
 
 interface CreatePaymentDto {
     amount: number;
@@ -55,6 +56,15 @@ export class PaymentService {
                 reference: data.reference,
                 notes: data.notes,
             },
+        });
+
+        // Create notification
+        await notificationService.create({
+            type: 'PAYMENT_RECEIVED',
+            title: 'Paiement reçu',
+            message: `Paiement de ${Number(payment.amount).toFixed(2)} TND reçu pour la facture ${invoice.reference}`,
+            entityType: 'payment',
+            entityId: payment.id,
         });
 
         return payment;

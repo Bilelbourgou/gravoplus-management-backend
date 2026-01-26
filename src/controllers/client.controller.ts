@@ -47,7 +47,7 @@ export class ClientController {
                 email,
                 address,
                 notes,
-            });
+            }, req.user?.id);
 
             res.status(201).json({
                 success: true,

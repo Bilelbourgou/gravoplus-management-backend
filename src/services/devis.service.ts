@@ -3,6 +3,7 @@ import prisma from '../config/database';
 import { CreateDevisDto, AddDevisLineDto, AddDevisServiceDto, DevisStatus, UserRole } from '../types';
 import { ApiError } from '../middleware';
 import { calculationService } from './calculation.service';
+import { notificationService } from './notification.service';
 
 export class DevisService {
     /**
@@ -129,7 +130,7 @@ export class DevisService {
 
         const reference = await this.generateReference();
 
-        return prisma.devis.create({
+        const devis = await prisma.devis.create({
             data: {
                 reference,
                 clientId: data.clientId,
@@ -143,6 +144,18 @@ export class DevisService {
                 },
             },
         });
+
+        // Create notification
+        await notificationService.create({
+            type: 'DEVIS_CREATED',
+            title: 'Nouveau devis',
+            message: `Devis ${devis.reference} créé pour ${client.name}`,
+            entityType: 'devis',
+            entityId: devis.id,
+            triggeredById: userId,
+        });
+
+        return devis;
     }
 
     /**
@@ -333,13 +346,25 @@ export class DevisService {
             throw new ApiError(400, 'Cannot validate an empty devis');
         }
 
-        return prisma.devis.update({
+        const updatedDevis = await prisma.devis.update({
             where: { id: devisId },
             data: {
                 status: DevisStatus.VALIDATED,
                 validatedAt: new Date(),
             },
+            include: { client: true },
         });
+
+        // Create notification
+        await notificationService.create({
+            type: 'DEVIS_VALIDATED',
+            title: 'Devis validé',
+            message: `Devis ${updatedDevis.reference} a été validé`,
+            entityType: 'devis',
+            entityId: devisId,
+        });
+
+        return updatedDevis;
     }
 
     /**

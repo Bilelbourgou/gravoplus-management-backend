@@ -9,6 +9,8 @@ import machineRoutes from './machine.routes';
 import serviceRoutes from './service.routes';
 import materialRoutes from './material.routes';
 import dashboardRoutes from './dashboard.routes';
+import expenseRoutes from './expense.routes';
+import notificationRoutes from './notification.routes';
 
 const router = Router();
 
@@ -22,6 +24,8 @@ router.use('/machines', machineRoutes);
 router.use('/services', serviceRoutes);
 router.use('/materials', materialRoutes);
 router.use('/dashboard', dashboardRoutes);
+router.use('/expenses', expenseRoutes);
+router.use('/notifications', notificationRoutes);
 
 // Health check
 router.get('/health', (_req, res) => {

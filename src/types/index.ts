@@ -20,6 +20,8 @@ export enum DevisStatus {
 export interface UserPayload {
     id: string;
     username: string;
+    firstName: string;
+    lastName: string;
     role: UserRole;
 }
 

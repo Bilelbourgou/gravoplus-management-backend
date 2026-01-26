@@ -28,6 +28,8 @@ model User {
   // Relations
   allowedMachines UserMachine[]
   createdDevis    Devis[]       @relation("CreatedBy")
+  createdExpenses Expense[]     @relation("ExpenseCreatedBy")
+  triggeredNotifications Notification[] @relation("NotificationTriggeredBy")
   
   @@map("users")
 }
@@ -216,4 +218,39 @@ model Payment {
   invoice       Invoice   @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
   
   @@map("payments")
+}
+
+model Expense {
+  id            String    @id @default(uuid())
+  description   String
+  amount        Decimal
+  category      String    // "Matériel", "Fournitures", "Transport", "Maintenance", "Salaires", "Loyer", "Électricité", "Autre"
+  date          DateTime  @default(now())
+  reference     String?   // Receipt number, invoice number, etc.
+  notes         String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  
+  // Relations
+  createdById   String
+  createdBy     User      @relation("ExpenseCreatedBy", fields: [createdById], references: [id], onDelete: Cascade)
+  
+  @@map("expenses")
+}
+
+model Notification {
+  id            String    @id @default(uuid())
+  type          String    // "CLIENT_CREATED", "DEVIS_CREATED", "INVOICE_CREATED", "EXPENSE_CREATED", "PAYMENT_RECEIVED", etc.
+  title         String
+  message       String
+  entityType    String?   // "client", "devis", "invoice", "expense", "payment"
+  entityId      String?   // ID of the related entity
+  isRead        Boolean   @default(false)
+  createdAt     DateTime  @default(now())
+  
+  // Relations - notification triggered by this user
+  triggeredById String?
+  triggeredBy   User?     @relation("NotificationTriggeredBy", fields: [triggeredById], references: [id], onDelete: SetNull)
+  
+  @@map("notifications")
 }

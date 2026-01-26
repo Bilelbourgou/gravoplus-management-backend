@@ -2,9 +2,12 @@ import prisma from '../config/database';
 
 export interface DashboardStats {
     totalClients: number;
+    totalEmployees: number;
     totalDevis: number;
     totalInvoices: number;
     totalRevenue: number;
+    totalExpenses: number;
+    netProfit: number;
     devisByStatus: {
         draft: number;
         validated: number;
@@ -23,6 +26,11 @@ export interface DashboardStats {
         month: string;
         revenue: number;
     }>;
+    monthlyExpenses: Array<{
+        month: string;
+        expenses: number;
+    }>;
+    expensesByCategory: Record<string, number>;
 }
 
 export class DashboardService {
@@ -31,8 +39,9 @@ export class DashboardService {
      */
     async getStats(): Promise<DashboardStats> {
         // Get counts
-        const [totalClients, totalDevis, totalInvoices] = await Promise.all([
+        const [totalClients, totalEmployees, totalDevis, totalInvoices] = await Promise.all([
             prisma.client.count(),
+            prisma.user.count({ where: { role: 'EMPLOYEE', isActive: true } }),
             prisma.devis.count(),
             prisma.invoice.count(),
         ]);
@@ -47,6 +56,24 @@ export class DashboardService {
             (sum, d) => sum + Number(d.totalAmount),
             0
         );
+
+        // Get total expenses
+        const allExpenses = await prisma.expense.findMany({
+            select: { amount: true, category: true, date: true },
+        });
+
+        const totalExpenses = allExpenses.reduce(
+            (sum, e) => sum + Number(e.amount),
+            0
+        );
+
+        const netProfit = totalRevenue - totalExpenses;
+
+        // Get expenses by category
+        const expensesByCategory: Record<string, number> = {};
+        for (const e of allExpenses) {
+            expensesByCategory[e.category] = (expensesByCategory[e.category] || 0) + Number(e.amount);
+        }
 
         // Get devis by status
         const [draft, validated, invoiced, cancelled] = await Promise.all([
@@ -112,11 +139,36 @@ export class DashboardService {
             revenue: Math.round(revenue * 100) / 100,
         }));
 
+        // Get monthly expenses for the last 6 months
+        const expensesByMonth = new Map<string, number>();
+        for (let i = 5; i >= 0; i--) {
+            const date = new Date();
+            date.setMonth(date.getMonth() - i);
+            const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+            expensesByMonth.set(key, 0);
+        }
+
+        for (const e of allExpenses) {
+            const expenseDate = new Date(e.date);
+            const key = `${expenseDate.getFullYear()}-${String(expenseDate.getMonth() + 1).padStart(2, '0')}`;
+            if (expensesByMonth.has(key)) {
+                expensesByMonth.set(key, (expensesByMonth.get(key) || 0) + Number(e.amount));
+            }
+        }
+
+        const monthlyExpenses = Array.from(expensesByMonth.entries()).map(([month, expenses]) => ({
+            month,
+            expenses: Math.round(expenses * 100) / 100,
+        }));
+
         return {
             totalClients,
+            totalEmployees,
             totalDevis,
             totalInvoices,
             totalRevenue: Math.round(totalRevenue * 100) / 100,
+            totalExpenses: Math.round(totalExpenses * 100) / 100,
+            netProfit: Math.round(netProfit * 100) / 100,
             devisByStatus: {
                 draft,
                 validated,
@@ -125,6 +177,8 @@ export class DashboardService {
             },
             recentDevis,
             monthlyRevenue,
+            monthlyExpenses,
+            expensesByCategory,
         };
     }
 }
