@@ -11,16 +11,29 @@ export class DevisService {
      */
     private async generateReference(): Promise<string> {
         const year = new Date().getFullYear();
-        const count = await prisma.devis.count({
+        const lastDevis = await prisma.devis.findFirst({
             where: {
                 reference: {
                     startsWith: `DEV-${year}`,
                 },
             },
+            orderBy: {
+                createdAt: 'desc',
+            },
         });
 
-        const number = (count + 1).toString().padStart(4, '0');
-        return `DEV-${year}-${number}`;
+        let number = 1;
+        if (lastDevis) {
+            const parts = lastDevis.reference.split('-');
+            if (parts.length === 3) {
+                const lastNum = parseInt(parts[2], 10);
+                if (!isNaN(lastNum)) {
+                    number = lastNum + 1;
+                }
+            }
+        }
+
+        return `DEV-${year}-${number.toString().padStart(4, '0')}`;
     }
 
     /**

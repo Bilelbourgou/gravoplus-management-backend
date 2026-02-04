@@ -17,16 +17,29 @@ export class InvoiceService {
      */
     private async generateReference(): Promise<string> {
         const year = new Date().getFullYear();
-        const count = await prisma.invoice.count({
+        const lastInvoice = await prisma.invoice.findFirst({
             where: {
                 reference: {
                     startsWith: `INV-${year}`,
                 },
             },
+            orderBy: {
+                createdAt: 'desc',
+            },
         });
 
-        const number = (count + 1).toString().padStart(4, '0');
-        return `INV-${year}-${number}`;
+        let number = 1;
+        if (lastInvoice) {
+            const parts = lastInvoice.reference.split('-');
+            if (parts.length === 3) {
+                const lastNum = parseInt(parts[2], 10);
+                if (!isNaN(lastNum)) {
+                    number = lastNum + 1;
+                }
+            }
+        }
+
+        return `INV-${year}-${number.toString().padStart(4, '0')}`;
     }
 
     /**
