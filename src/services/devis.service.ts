@@ -18,7 +18,7 @@ export class DevisService {
                 },
             },
             orderBy: {
-                createdAt: 'desc',
+                reference: 'desc',
             },
         });
 

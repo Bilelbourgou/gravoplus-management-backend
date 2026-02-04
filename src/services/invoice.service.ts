@@ -24,7 +24,7 @@ export class InvoiceService {
                 },
             },
             orderBy: {
-                createdAt: 'desc',
+                reference: 'desc',
             },
         });
 
