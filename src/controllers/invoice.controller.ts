@@ -2,9 +2,14 @@ import { Request, Response, NextFunction } from 'express';
 import { invoiceService } from '../services';
 
 export class InvoiceController {
-    async getAll(_req: Request, res: Response, next: NextFunction) {
+    async getAll(req: Request, res: Response, next: NextFunction) {
         try {
-            const invoices = await invoiceService.getAllInvoices();
+            const { dateFrom, dateTo } = req.query;
+
+            const invoices = await invoiceService.getAllInvoices(
+                dateFrom ? new Date(dateFrom as string) : undefined,
+                dateTo ? new Date(dateTo as string) : undefined
+            );
 
             res.json({
                 success: true,

@@ -19,7 +19,7 @@ interface UpdatePaymentDto {
 }
 
 export class PaymentService {
-    async createPayment(invoiceId: string, data: CreatePaymentDto) {
+    async createPayment(invoiceId: string, data: CreatePaymentDto, userId?: string) {
         const invoice = await prisma.invoice.findUnique({
             where: { id: invoiceId },
             include: {
@@ -55,6 +55,7 @@ export class PaymentService {
                 paymentMethod: data.paymentMethod,
                 reference: data.reference,
                 notes: data.notes,
+                createdById: userId,
             },
         });
 

@@ -11,13 +11,15 @@ async function main() {
     const adminPassword = await bcrypt.hash('admin123', 12);
     const admin = await prisma.user.upsert({
         where: { username: 'admin' },
-        update: {},
+        update: {
+            role: 'SUPERADMIN',
+        },
         create: {
             username: 'admin',
             password: adminPassword,
             firstName: 'Administrateur',
             lastName: 'GravoPlus',
-            role: 'ADMIN',
+            role: 'SUPERADMIN',
         },
     });
     console.log('✅ Admin user created:', admin.username);
@@ -128,12 +130,12 @@ async function main() {
 
     // Create sample validated devis for the same client (to test multi-devis invoice feature)
     const testClient = createdClients[0]; // Entreprise ABC
-    
+
     // Create 3 validated devis for the same client
     for (let i = 1; i <= 3; i++) {
         const reference = `DEV-2025-000${i}`;
         const totalAmount = (i === 1 ? 45 : i === 2 ? 60 : 50) + (50 * i);
-        
+
         const devis = await prisma.devis.upsert({
             where: { reference },
             update: {},

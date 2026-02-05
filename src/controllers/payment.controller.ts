@@ -7,7 +7,9 @@ export class PaymentController {
             const { invoiceId } = req.params;
             const paymentData = req.body;
 
-            const payment = await paymentService.createPayment(invoiceId as string, paymentData);
+            const userId = req.user?.id;
+            console.log('Creating payment with userId:', userId);
+            const payment = await paymentService.createPayment(invoiceId as string, req.body, userId);
 
             res.status(201).json({
                 success: true,

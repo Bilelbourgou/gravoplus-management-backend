@@ -317,8 +317,30 @@ export class InvoiceService {
     /**
      * Get all invoices
      */
-    async getAllInvoices() {
+    /**
+     * Get all invoices with optional date filtering
+     */
+    async getAllInvoices(dateFrom?: Date, dateTo?: Date) {
+        const where: any = {};
+
+        if (dateFrom || dateTo) {
+            where.createdAt = {};
+            if (dateFrom) {
+                // Set to start of day
+                const start = new Date(dateFrom);
+                start.setHours(0, 0, 0, 0);
+                where.createdAt.gte = start;
+            }
+            if (dateTo) {
+                // Set to end of day
+                const end = new Date(dateTo);
+                end.setHours(23, 59, 59, 999);
+                where.createdAt.lte = end;
+            }
+        }
+
         return prisma.invoice.findMany({
+            where,
             orderBy: { createdAt: 'desc' },
             include: {
                 client: {

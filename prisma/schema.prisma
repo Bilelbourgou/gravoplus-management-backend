@@ -20,7 +20,7 @@ model User {
   password      String    // bcrypt hashed
   firstName     String
   lastName      String
-  role          String    @default("EMPLOYEE") // ADMIN | EMPLOYEE
+  role          String    @default("EMPLOYEE") // SUPERADMIN | ADMIN | EMPLOYEE
   isActive      Boolean   @default(true)
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
@@ -29,6 +29,8 @@ model User {
   allowedMachines UserMachine[]
   createdDevis    Devis[]       @relation("CreatedBy")
   createdExpenses Expense[]     @relation("ExpenseCreatedBy")
+  createdPayments Payment[]     @relation("PaymentCreatedBy")
+  financialClosures FinancialClosure[]
   triggeredNotifications Notification[] @relation("NotificationTriggeredBy")
   
   @@map("users")
@@ -216,6 +218,10 @@ model Payment {
   // Relations
   invoiceId     String
   invoice       Invoice   @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+
+  createdById   String?   // Helper: Make nullable initially to avoid migration errors on existing data, or default if possible. Better to be optional for now or handle via migration script. 
+                          // Actually, we can make it optional for existing data compatibility.
+  createdBy     User?     @relation("PaymentCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
   
   @@map("payments")
 }
@@ -253,4 +259,28 @@ model Notification {
   triggeredBy   User?     @relation("NotificationTriggeredBy", fields: [triggeredById], references: [id], onDelete: SetNull)
   
   @@map("notifications")
+}
+
+model FinancialClosure {
+  id            String    @id @default(uuid())
+  closureDate   DateTime  @default(now())
+  
+  // Period covered by this closure
+  periodStart   DateTime
+  periodEnd     DateTime
+  
+  // Snapshot of totals
+  totalIncome   Decimal
+  totalExpense  Decimal
+  balance       Decimal
+  
+  notes         String?
+  scope         String    @default("EMPLOYEE_LEVEL") // "EMPLOYEE_LEVEL" | "ADMIN_LEVEL"
+  
+  createdById   String
+  createdBy     User      @relation(fields: [createdById], references: [id])
+  
+  createdAt     DateTime  @default(now())
+  
+  @@map("financial_closures")
 }

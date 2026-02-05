@@ -46,14 +46,13 @@ export class DashboardService {
             prisma.invoice.count(),
         ]);
 
-        // Get revenue from invoiced devis
-        const invoicedDevis = await prisma.devis.findMany({
-            where: { status: 'INVOICED' },
+        // Get revenue from all invoices (including direct invoices)
+        const allInvoices = await prisma.invoice.findMany({
             select: { totalAmount: true },
         });
 
-        const totalRevenue = invoicedDevis.reduce(
-            (sum, d) => sum + Number(d.totalAmount),
+        const totalRevenue = allInvoices.reduce(
+            (sum, inv) => sum + Number(inv.totalAmount),
             0
         );
 
@@ -107,9 +106,8 @@ export class DashboardService {
         const sixMonthsAgo = new Date();
         sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
 
-        const devisForRevenue = await prisma.devis.findMany({
+        const invoicesForRevenue = await prisma.invoice.findMany({
             where: {
-                status: 'INVOICED',
                 createdAt: { gte: sixMonthsAgo },
             },
             select: {
@@ -127,10 +125,10 @@ export class DashboardService {
             revenueByMonth.set(key, 0);
         }
 
-        for (const d of devisForRevenue) {
-            const key = `${d.createdAt.getFullYear()}-${String(d.createdAt.getMonth() + 1).padStart(2, '0')}`;
+        for (const inv of invoicesForRevenue) {
+            const key = `${inv.createdAt.getFullYear()}-${String(inv.createdAt.getMonth() + 1).padStart(2, '0')}`;
             if (revenueByMonth.has(key)) {
-                revenueByMonth.set(key, (revenueByMonth.get(key) || 0) + Number(d.totalAmount));
+                revenueByMonth.set(key, (revenueByMonth.get(key) || 0) + Number(inv.totalAmount));
             }
         }
 

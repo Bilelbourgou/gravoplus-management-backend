@@ -59,5 +59,6 @@ export const requireRole = (...roles: UserRole[]) => {
     };
 };
 
-export const isAdmin = requireRole(UserRole.ADMIN);
-export const isEmployeeOrAdmin = requireRole(UserRole.ADMIN, UserRole.EMPLOYEE);
+export const isSuperAdmin = requireRole(UserRole.SUPERADMIN);
+export const isAdmin = requireRole(UserRole.SUPERADMIN, UserRole.ADMIN);
+export const isEmployeeOrAdmin = requireRole(UserRole.SUPERADMIN, UserRole.ADMIN, UserRole.EMPLOYEE);
