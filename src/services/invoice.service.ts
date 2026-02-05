@@ -353,6 +353,11 @@ export class InvoiceService {
                         totalAmount: true,
                     },
                 },
+                payments: {
+                    select: {
+                        amount: true,
+                    },
+                },
             },
         });
     }

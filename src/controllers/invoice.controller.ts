@@ -11,9 +11,28 @@ export class InvoiceController {
                 dateTo ? new Date(dateTo as string) : undefined
             );
 
+            const invoicesWithStats = invoices.map(inv => {
+                const totalAmount = Number(inv.totalAmount);
+                const paidAmount = inv.payments.reduce((sum, p) => sum + Number(p.amount), 0);
+
+                let status = 'PENDING';
+                if (paidAmount >= totalAmount) {
+                    status = 'PAID';
+                } else if (paidAmount > 0) {
+                    status = 'PARTIAL';
+                }
+
+                return {
+                    ...inv,
+                    totalAmount,
+                    paidAmount,
+                    status,
+                };
+            });
+
             res.json({
                 success: true,
-                data: invoices,
+                data: invoicesWithStats,
             });
         } catch (error) {
             next(error);
