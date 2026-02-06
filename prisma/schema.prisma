@@ -172,6 +172,8 @@ model DevisService {
   @@map("devis_services")
 }
 
+
+
 model Invoice {
   id            String    @id @default(uuid())
   reference     String    @unique  // INV-2024-0001

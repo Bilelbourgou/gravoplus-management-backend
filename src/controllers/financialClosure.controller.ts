@@ -14,8 +14,8 @@ export const getFinancialStats = async (req: Request, res: Response) => {
 
     // Target roles for transactions
     // If Admin is viewing, they want to see Employee transactions
-    // If Superadmin is viewing, they want to see Admin transactions
-    const targetRoles = userRole === 'SUPERADMIN' ? ['ADMIN'] : ['EMPLOYEE'];
+    // If Superadmin is viewing, they want to see Admin AND Superadmin transactions
+    const targetRoles = userRole === 'SUPERADMIN' ? ['ADMIN', 'SUPERADMIN'] : ['EMPLOYEE'];
 
     // Find the last closure of this specific scope
     const lastClosure = await prisma.financialClosure.findFirst({
@@ -42,6 +42,9 @@ export const getFinancialStats = async (req: Request, res: Response) => {
           include: {
             client: { select: { name: true } }
           }
+        },
+        createdBy: {
+          select: { firstName: true, lastName: true }
         }
       },
       orderBy: { paymentDate: 'desc' },
@@ -72,7 +75,7 @@ export const getFinancialStats = async (req: Request, res: Response) => {
     const balance = totalIncome - totalExpense;
 
     res.json({
-      periodStart: startDate,
+      periodStart: lastClosure ? startDate : null,
       periodEnd: endDate,
       totalIncome,
       totalExpense,
@@ -100,7 +103,7 @@ export const createClosure = async (req: Request, res: Response) => {
     }
 
     const closureScope = userRole === 'SUPERADMIN' ? 'ADMIN_LEVEL' : 'EMPLOYEE_LEVEL';
-    const targetRoles = userRole === 'SUPERADMIN' ? ['ADMIN'] : ['EMPLOYEE'];
+    const targetRoles = userRole === 'SUPERADMIN' ? ['ADMIN', 'SUPERADMIN'] : ['EMPLOYEE'];
 
     // Find last closure of this scope to determine start date
     const lastClosure = await prisma.financialClosure.findFirst({
