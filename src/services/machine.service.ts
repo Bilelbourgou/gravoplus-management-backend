@@ -50,6 +50,7 @@ export class MachineService {
             { machineType: MachineType.LASER, pricePerUnit: 2.0, description: 'Prix par minute' },
             { machineType: MachineType.CHAMPS, pricePerUnit: 5.0, description: 'Prix par mètre' },
             { machineType: MachineType.PANNEAUX, pricePerUnit: 25.0, description: 'Prix par unité' },
+            { machineType: MachineType.SERVICE_MAINTENANCE, pricePerUnit: 50.0, description: 'Prix forfaitaire' },
         ];
 
         for (const pricing of defaults) {

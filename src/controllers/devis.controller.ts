@@ -70,7 +70,7 @@ export class DevisController {
     async addLine(req: Request, res: Response, next: NextFunction) {
         try {
             const { id } = req.params;
-            const { machineType, description, minutes, meters, quantity, materialId } = req.body;
+            const { machineType, description, minutes, meters, quantity, materialId, unitPrice } = req.body;
 
             if (!machineType) {
                 res.status(400).json({
@@ -91,6 +91,7 @@ export class DevisController {
                     meters,
                     quantity,
                     materialId,
+                    unitPrice,
                 }
             );
 

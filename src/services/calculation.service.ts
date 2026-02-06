@@ -8,16 +8,22 @@ export class CalculationService {
      * Calculate line total based on machine type and inputs
      */
     async calculateLine(input: CalculationInput): Promise<CalculationResult> {
-        // Get machine pricing
-        const pricing = await prisma.machinePricing.findUnique({
-            where: { machineType: input.machineType },
-        });
+        let unitPrice = 0;
 
-        if (!pricing) {
-            throw new ApiError(400, `Pricing not found for machine type: ${input.machineType}`);
+        // If manual price provided (e.g. for SERVICE_MAINTENANCE), use it
+        if (input.unitPrice !== undefined && input.unitPrice !== null) {
+            unitPrice = Number(input.unitPrice);
+        } else {
+            // Otherwise get machine pricing from DB
+            const pricing = await prisma.machinePricing.findUnique({
+                where: { machineType: input.machineType },
+            });
+
+            if (!pricing) {
+                throw new ApiError(400, `Pricing not found for machine type: ${input.machineType}`);
+            }
+            unitPrice = Number(pricing.pricePerUnit);
         }
-
-        const unitPrice = Number(pricing.pricePerUnit);
         let lineTotal = 0;
         let materialCost = 0;
         let breakdown = '';
@@ -70,6 +76,14 @@ export class CalculationService {
                 }
                 lineTotal = input.quantity * unitPrice;
                 breakdown = `${input.quantity} units × ${unitPrice} TND/unit = ${lineTotal.toFixed(2)} TND`;
+                break;
+
+            case MachineType.SERVICE_MAINTENANCE:
+                // Service Maintenance: quantity × unitPrice
+                // Default quantity to 1 if not provided
+                const qty = input.quantity && input.quantity > 0 ? input.quantity : 1;
+                lineTotal = qty * unitPrice;
+                breakdown = `${qty} ${qty > 1 ? 'services' : 'service'} × ${unitPrice} TND = ${lineTotal.toFixed(2)} TND`;
                 break;
 
             default:

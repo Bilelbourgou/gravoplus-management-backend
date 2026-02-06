@@ -9,6 +9,7 @@ export enum MachineType {
     LASER = 'LASER',
     CHAMPS = 'CHAMPS',
     PANNEAUX = 'PANNEAUX',
+    SERVICE_MAINTENANCE = 'SERVICE_MAINTENANCE',
 }
 
 export enum DevisStatus {
@@ -66,6 +67,7 @@ export interface AddDevisLineDto {
     meters?: number;
     quantity?: number;
     materialId?: string;
+    unitPrice?: number;
 }
 
 export interface AddDevisServiceDto {
@@ -78,6 +80,7 @@ export interface CalculationInput {
     meters?: number;
     quantity?: number;
     materialId?: string;
+    unitPrice?: number;
 }
 
 export interface CalculationResult {

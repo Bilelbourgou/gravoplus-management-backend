@@ -208,6 +208,7 @@ export class DevisService {
             meters: data.meters,
             quantity: data.quantity,
             materialId: data.materialId,
+            unitPrice: data.unitPrice,
         });
 
         const line = await prisma.devisLine.create({
