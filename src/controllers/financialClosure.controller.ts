@@ -14,8 +14,8 @@ export const getFinancialStats = async (req: Request, res: Response) => {
 
     // Target roles for transactions
     // If Admin is viewing, they want to see Employee transactions
-    // If Superadmin is viewing, they want to see Admin AND Superadmin transactions
-    const targetRoles = userRole === 'SUPERADMIN' ? ['ADMIN', 'SUPERADMIN'] : ['EMPLOYEE'];
+    // If Superadmin is viewing, they want to see ALL transactions (Employee, Admin, Superadmin)
+    const targetRoles = userRole === 'SUPERADMIN' ? ['EMPLOYEE', 'ADMIN', 'SUPERADMIN'] : ['EMPLOYEE'];
 
     // Find the last closure of this specific scope
     const lastClosure = await prisma.financialClosure.findFirst({
