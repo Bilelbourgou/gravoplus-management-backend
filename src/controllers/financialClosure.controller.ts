@@ -9,16 +9,13 @@ export const getFinancialStats = async (req: Request, res: Response) => {
   try {
     const userRole = req.user?.role;
     // Admin closes Employee sessions (EMPLOYEE_LEVEL)
-    // Superadmin defaults to EMPLOYEE_LEVEL to see shop stats, but can request ADMIN_LEVEL
-    const requestedScope = req.query.scope as string;
-    const closureScope = (userRole === 'SUPERADMIN' && requestedScope === 'ADMIN_LEVEL')
-      ? 'ADMIN_LEVEL'
-      : 'EMPLOYEE_LEVEL';
+    // Superadmin closes Admin sessions (ADMIN_LEVEL)
+    const closureScope = userRole === 'SUPERADMIN' ? 'ADMIN_LEVEL' : 'EMPLOYEE_LEVEL';
 
     // Target roles for transactions
     // If Admin is viewing, they want to see Employee transactions
-    // If Superadmin is viewing (default), they want to see Employee transactions too
-    const targetRoles = closureScope === 'ADMIN_LEVEL' ? ['ADMIN', 'SUPERADMIN'] : ['EMPLOYEE'];
+    // If Superadmin is viewing, they want to see Admin AND Superadmin transactions
+    const targetRoles = userRole === 'SUPERADMIN' ? ['ADMIN', 'SUPERADMIN'] : ['EMPLOYEE'];
 
     // Find the last closure of this specific scope
     const lastClosure = await prisma.financialClosure.findFirst({
