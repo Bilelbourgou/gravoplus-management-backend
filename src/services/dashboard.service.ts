@@ -8,6 +8,9 @@ export interface DashboardStats {
     totalRevenue: number;
     totalExpenses: number;
     netProfit: number;
+    todaysDevisTotal: number;
+    todaysInvoicesTotal: number;
+    todaysPaymentsTotal: number;
     devisByStatus: {
         draft: number;
         validated: number;
@@ -38,6 +41,12 @@ export class DashboardService {
      * Get dashboard statistics
      */
     async getStats(): Promise<DashboardStats> {
+        // Date range for today
+        const todayStart = new Date();
+        todayStart.setHours(0, 0, 0, 0);
+        const todayEnd = new Date();
+        todayEnd.setHours(23, 59, 59, 999);
+
         // Get counts
         const [totalClients, totalEmployees, totalDevis, totalInvoices] = await Promise.all([
             prisma.client.count(),
@@ -159,6 +168,43 @@ export class DashboardService {
             expenses: Math.round(expenses * 100) / 100,
         }));
 
+        // Calculate daily totals
+        const todaysDevis = await prisma.devis.aggregate({
+            _sum: {
+                totalAmount: true,
+            },
+            where: {
+                createdAt: {
+                    gte: todayStart,
+                    lte: todayEnd,
+                },
+            },
+        });
+
+        const todaysInvoices = await prisma.invoice.aggregate({
+            _sum: {
+                totalAmount: true,
+            },
+            where: {
+                createdAt: {
+                    gte: todayStart,
+                    lte: todayEnd,
+                },
+            },
+        });
+
+        const todaysPayments = await prisma.payment.aggregate({
+            _sum: {
+                amount: true,
+            },
+            where: {
+                paymentDate: {
+                    gte: todayStart,
+                    lte: todayEnd,
+                },
+            },
+        });
+
         return {
             totalClients,
             totalEmployees,
@@ -167,6 +213,9 @@ export class DashboardService {
             totalRevenue: Math.round(totalRevenue * 100) / 100,
             totalExpenses: Math.round(totalExpenses * 100) / 100,
             netProfit: Math.round(netProfit * 100) / 100,
+            todaysDevisTotal: Number(todaysDevis._sum.totalAmount || 0),
+            todaysInvoicesTotal: Number(todaysInvoices._sum.totalAmount || 0),
+            todaysPaymentsTotal: Number(todaysPayments._sum.amount || 0),
             devisByStatus: {
                 draft,
                 validated,
