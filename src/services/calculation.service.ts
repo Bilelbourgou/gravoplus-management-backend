@@ -13,6 +13,9 @@ export class CalculationService {
         // If manual price provided (e.g. for SERVICE_MAINTENANCE), use it
         if (input.unitPrice !== undefined && input.unitPrice !== null) {
             unitPrice = Number(input.unitPrice);
+        } else if (input.machineType === MachineType.VENTE_MATERIAU) {
+            // Price comes from material, handled in switch
+            unitPrice = 0;
         } else {
             // Otherwise get machine pricing from DB
             const pricing = await prisma.machinePricing.findUnique({
@@ -30,12 +33,35 @@ export class CalculationService {
 
         switch (input.machineType) {
             case MachineType.CNC:
-                // CNC: minutes × pricePerMinute
+                // CNC: minutes × pricePerMinute + optional material
                 if (!input.minutes || input.minutes <= 0) {
                     throw new ApiError(400, 'Minutes are required for CNC calculation');
                 }
-                lineTotal = input.minutes * unitPrice;
-                breakdown = `${input.minutes} min × ${unitPrice} TND/min = ${lineTotal.toFixed(2)} TND`;
+                const cncMachineWork = input.minutes * unitPrice;
+
+                if (input.materialId) {
+                    const material = await prisma.material.findUnique({
+                        where: { id: input.materialId },
+                    });
+
+                    if (material) {
+                        if (input.width && input.height && material.unit === 'm²') {
+                            const widthInMeters = input.dimensionUnit === 'cm' ? input.width / 100 : input.width;
+                            const heightInMeters = input.dimensionUnit === 'cm' ? input.height / 100 : input.height;
+                            const area = widthInMeters * heightInMeters;
+
+                            materialCost = area * Number(material.pricePerUnit);
+                            breakdown = `(${input.minutes} min × ${unitPrice} TND/min) + (${widthInMeters}m × ${heightInMeters}m × ${Number(material.pricePerUnit)} TND/m²) = ${(cncMachineWork + materialCost).toFixed(2)} TND`;
+                        } else {
+                            materialCost = Number(material.pricePerUnit);
+                            breakdown = `(${input.minutes} min × ${unitPrice} TND/min) + ${materialCost.toFixed(2)} TND material = ${(cncMachineWork + materialCost).toFixed(2)} TND`;
+                        }
+                    }
+                } else {
+                    breakdown = `${input.minutes} min × ${unitPrice} TND/min = ${cncMachineWork.toFixed(2)} TND`;
+                }
+
+                lineTotal = cncMachineWork + materialCost;
                 break;
 
             case MachineType.LASER:
@@ -52,12 +78,25 @@ export class CalculationService {
                     });
 
                     if (material) {
-                        materialCost = Number(material.pricePerUnit);
+                        // Check if we have dimensions for area calculation
+                        if (input.width && input.height && material.unit === 'm²') {
+                            const widthInMeters = input.dimensionUnit === 'cm' ? input.width / 100 : input.width;
+                            const heightInMeters = input.dimensionUnit === 'cm' ? input.height / 100 : input.height;
+                            const area = widthInMeters * heightInMeters;
+
+                            materialCost = area * Number(material.pricePerUnit);
+                            breakdown = `(${input.minutes} min × ${unitPrice} TND/min) + (${widthInMeters}m × ${heightInMeters}m × ${Number(material.pricePerUnit)} TND/m²) = ${(machineWork + materialCost).toFixed(2)} TND`;
+                        } else {
+                            // Fallback to unit price if no dimensions or unit isn't m²
+                            materialCost = Number(material.pricePerUnit);
+                            breakdown = `(${input.minutes} min × ${unitPrice} TND/min) + ${materialCost.toFixed(2)} TND material = ${(machineWork + materialCost).toFixed(2)} TND`;
+                        }
                     }
+                } else {
+                    breakdown = `${input.minutes} min × ${unitPrice} TND/min = ${machineWork.toFixed(2)} TND`;
                 }
 
                 lineTotal = machineWork + materialCost;
-                breakdown = `(${input.minutes} min × ${unitPrice} TND/min) + ${materialCost.toFixed(2)} TND material = ${lineTotal.toFixed(2)} TND`;
                 break;
 
             case MachineType.CHAMPS:
@@ -84,6 +123,46 @@ export class CalculationService {
                 const qty = input.quantity && input.quantity > 0 ? input.quantity : 1;
                 lineTotal = qty * unitPrice;
                 breakdown = `${qty} ${qty > 1 ? 'services' : 'service'} × ${unitPrice} TND = ${lineTotal.toFixed(2)} TND`;
+                break;
+
+            case MachineType.VENTE_MATERIAU:
+                // Vente Materiau: Area * PricePerUnit
+                if (!input.materialId) {
+                    throw new ApiError(400, 'Material represents required for Vente Materiau');
+                }
+                if (!input.width || !input.height) {
+                    throw new ApiError(400, 'Width and Height are required for Vente Materiau');
+                }
+
+                if (input.width <= 0 || input.height <= 0) {
+                    throw new ApiError(400, 'Dimensions must be greater than 0');
+                }
+
+                // Fetch material to get price
+                const matSimple = await prisma.material.findUnique({
+                    where: { id: input.materialId },
+                });
+
+                if (!matSimple) {
+                    throw new ApiError(404, 'Material not found');
+                }
+
+                // Assuming material unit is m² for sheet materials
+                const wMeters = input.dimensionUnit === 'cm' ? input.width / 100 : input.width;
+                const hMeters = input.dimensionUnit === 'cm' ? input.height / 100 : input.height;
+                const areaSimple = wMeters * hMeters;
+
+                // Use material price as unit price if not overridden, but usually we use material price
+                // Here unitPrice passed in might be 0 if it came from machinePricing which doesn't exist for VENTE_MATERIAU?
+                // Actually, VENTE_MATERIAU might not have a MachinePricing entry. 
+                // We should use the material's price.
+
+                lineTotal = areaSimple * Number(matSimple.pricePerUnit);
+                breakdown = `${wMeters}m × ${hMeters}m × ${Number(matSimple.pricePerUnit)} TND/m² = ${lineTotal.toFixed(2)} TND`;
+
+                // Set these for the return object
+                unitPrice = Number(matSimple.pricePerUnit);
+                materialCost = lineTotal; // It's all material cost
                 break;
 
             default:

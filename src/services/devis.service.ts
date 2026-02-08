@@ -209,6 +209,9 @@ export class DevisService {
             quantity: data.quantity,
             materialId: data.materialId,
             unitPrice: data.unitPrice,
+            width: data.width,
+            height: data.height,
+            dimensionUnit: data.dimensionUnit,
         });
 
         const line = await prisma.devisLine.create({
@@ -223,6 +226,9 @@ export class DevisService {
                 materialCost: calculation.materialCost,
                 lineTotal: calculation.lineTotal,
                 materialId: data.materialId,
+                width: data.width ?? null,
+                height: data.height ?? null,
+                dimensionUnit: data.dimensionUnit ?? 'm',
             },
             include: {
                 material: true,

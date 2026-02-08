@@ -140,6 +140,9 @@ model DevisLine {
   minutes       Decimal?  // For CNC, Laser
   meters        Decimal?  // For Champs
   quantity      Int?      // For Panneaux
+  width         Decimal?  // For CNC, Laser (m or cm)
+  height        Decimal?  // For CNC, Laser (m or cm)
+  dimensionUnit String?   @default("m") // "m" | "cm"
   
   // Pricing at time of creation
   unitPrice     Decimal

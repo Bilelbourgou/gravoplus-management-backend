@@ -70,7 +70,7 @@ export class DevisController {
     async addLine(req: Request, res: Response, next: NextFunction) {
         try {
             const { id } = req.params;
-            const { machineType, description, minutes, meters, quantity, materialId, unitPrice } = req.body;
+            const { machineType, description, minutes, meters, quantity, materialId, unitPrice, width, height, dimensionUnit } = req.body;
 
             if (!machineType) {
                 res.status(400).json({
@@ -92,6 +92,9 @@ export class DevisController {
                     quantity,
                     materialId,
                     unitPrice,
+                    width,
+                    height,
+                    dimensionUnit,
                 }
             );
 
@@ -160,7 +163,7 @@ export class DevisController {
 
     async calculate(req: Request, res: Response, next: NextFunction) {
         try {
-            const { machineType, minutes, meters, quantity, materialId } = req.body;
+            const { machineType, minutes, meters, quantity, materialId, width, height, dimensionUnit } = req.body;
 
             if (!machineType) {
                 res.status(400).json({
@@ -176,6 +179,9 @@ export class DevisController {
                 meters,
                 quantity,
                 materialId,
+                width,
+                height,
+                dimensionUnit,
             });
 
             res.json({

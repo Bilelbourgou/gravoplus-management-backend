@@ -74,6 +74,26 @@ export const getFinancialStats = async (req: Request, res: Response) => {
     const totalExpense = expenses.reduce((sum, e) => sum + Number(e.amount), 0);
     const balance = totalIncome - totalExpense;
 
+    // Aggregate revenue by employee
+    const revenueByEmployeeMap = new Map<string, { employeeName: string; totalAmount: number; paymentCount: number }>();
+
+    for (const payment of payments) {
+      if (payment.createdBy) {
+        const employeeId = payment.createdById || 'unknown';
+        const employeeName = `${payment.createdBy.firstName} ${payment.createdBy.lastName}`;
+
+        const current = revenueByEmployeeMap.get(employeeId) || { employeeName, totalAmount: 0, paymentCount: 0 };
+        current.totalAmount += Number(payment.amount);
+        current.paymentCount += 1;
+        revenueByEmployeeMap.set(employeeId, current);
+      }
+    }
+
+    const revenueByEmployee = Array.from(revenueByEmployeeMap.entries()).map(([employeeId, data]) => ({
+      employeeId,
+      ...data
+    })).sort((a, b) => b.totalAmount - a.totalAmount);
+
     res.json({
       periodStart: lastClosure ? startDate : null,
       periodEnd: endDate,
@@ -84,6 +104,7 @@ export const getFinancialStats = async (req: Request, res: Response) => {
       scope: closureScope,
       payments,
       expenses,
+      revenueByEmployee,
     });
   } catch (error) {
     console.error('Error fetching financial stats:', error);
