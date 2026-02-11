@@ -253,6 +253,41 @@ export class DevisController {
             next(error);
         }
     }
+
+    async createCustomDevis(req: Request, res: Response, next: NextFunction) {
+        try {
+            const { clientId, items, notes } = req.body;
+
+            if (!clientId) {
+                res.status(400).json({
+                    success: false,
+                    error: 'Client ID is required',
+                });
+                return;
+            }
+
+            if (!items || !Array.isArray(items) || items.length === 0) {
+                res.status(400).json({
+                    success: false,
+                    error: 'At least one item is required',
+                });
+                return;
+            }
+
+            const devis = await devisService.createCustomDevis(req.user!.id, {
+                clientId,
+                items,
+                notes,
+            });
+
+            res.status(201).json({
+                success: true,
+                data: devis,
+            });
+        } catch (error) {
+            next(error);
+        }
+    }
 }
 
 export const devisController = new DevisController();

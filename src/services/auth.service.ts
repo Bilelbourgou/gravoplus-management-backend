@@ -187,9 +187,9 @@ export class AuthService {
     }
 
     /**
-     * Deactivate user
+     * Delete user
      */
-    async deactivateUser(userId: string) {
+    async deleteUser(userId: string) {
         const user = await prisma.user.findUnique({
             where: { id: userId },
         });
@@ -198,12 +198,11 @@ export class AuthService {
             throw new ApiError(404, 'User not found');
         }
 
-        await prisma.user.update({
+        await prisma.user.delete({
             where: { id: userId },
-            data: { isActive: false },
         });
 
-        return { message: 'User deactivated successfully' };
+        return { message: 'User deleted successfully' };
     }
 }
 

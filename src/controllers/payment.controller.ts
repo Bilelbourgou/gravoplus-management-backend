@@ -2,13 +2,39 @@ import { Request, Response, NextFunction } from 'express';
 import { paymentService } from '../services/payment.service';
 
 export class PaymentController {
+    async createCaissePayment(req: Request, res: Response, next: NextFunction) {
+        try {
+            const userId = req.user?.id;
+            const payment = await paymentService.createCaissePayment(req.body, userId);
+
+            res.status(201).json({
+                success: true,
+                data: payment,
+            });
+        } catch (error) {
+            next(error);
+        }
+    }
+
+    async getPaymentsByDevis(req: Request, res: Response, next: NextFunction) {
+        try {
+            const { devisId } = req.params;
+            const payments = await paymentService.getPaymentsByDevis(devisId as string);
+
+            res.json({
+                success: true,
+                data: payments,
+            });
+        } catch (error) {
+            next(error);
+        }
+    }
+
     async createPayment(req: Request, res: Response, next: NextFunction) {
         try {
             const { invoiceId } = req.params;
-            const paymentData = req.body;
 
             const userId = req.user?.id;
-            console.log('Creating payment with userId:', userId);
             const payment = await paymentService.createPayment(invoiceId as string, req.body, userId);
 
             res.status(201).json({

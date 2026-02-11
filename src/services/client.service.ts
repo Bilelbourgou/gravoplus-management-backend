@@ -131,37 +131,39 @@ export class ClientService {
     }
 
     /**
-     * Get client balance with detailed financial information
+     * Get client balance with detailed financial information (devis-centric flow)
      */
     async getClientBalance(clientId: string) {
         const client = await prisma.client.findUnique({
             where: { id: clientId },
             include: {
-                invoices: {
+                devis: {
+                    where: {
+                        status: { in: ['VALIDATED', 'INVOICED', 'DRAFT'] },
+                    },
+                    orderBy: { createdAt: 'desc' },
                     include: {
                         payments: {
                             orderBy: { paymentDate: 'desc' },
-                        },
-                        items: true,
-                        devis: {
-                            select: {
-                                id: true,
-                                reference: true,
-                                totalAmount: true,
-                                status: true,
+                            include: {
+                                createdBy: {
+                                    select: { firstName: true, lastName: true },
+                                },
                             },
                         },
-                    },
-                    orderBy: { createdAt: 'desc' },
-                },
-                devis: {
-                    where: {
-                        status: {
-                            in: ['VALIDATED', 'DRAFT'],
+                        invoice: {
+                            select: { id: true, reference: true, createdAt: true },
                         },
-                        invoiceId: null,
+                        createdBy: {
+                            select: { firstName: true, lastName: true, role: true },
+                        },
+                        lines: {
+                            include: { material: { select: { name: true } } },
+                        },
+                        services: {
+                            include: { service: { select: { name: true, price: true } } },
+                        },
                     },
-                    orderBy: { createdAt: 'desc' },
                 },
             },
         });
@@ -170,91 +172,65 @@ export class ClientService {
             throw new ApiError(404, 'Client not found');
         }
 
-        let totalInvoiced = 0;
+        let totalDevisAmount = 0;
         let totalPaid = 0;
 
-        console.log('\n=== CLIENT BALANCE DEBUG ===');
-        console.log('Client:', client.name, '(', client.id, ')');
-        console.log('Total invoices:', client.invoices.length);
-
-        const invoicesWithBalance = client.invoices.map((invoice) => {
-            const invoiceTotal = Number(invoice.totalAmount);
-            const paidAmount = invoice.payments.reduce(
-                (sum, payment) => sum + Number(payment.amount),
-                0
+        const devisWithBalance = client.devis.map((devis) => {
+            const devisTotal = Number(devis.totalAmount);
+            const paidAmount = devis.payments.reduce(
+                (sum, p) => sum + Number(p.amount), 0
             );
-            const balance = invoiceTotal - paidAmount;
+            const remaining = devisTotal - paidAmount;
 
-            console.log('\nInvoice:', invoice.reference);
-            console.log('  - Raw totalAmount:', invoice.totalAmount, '(type:', typeof invoice.totalAmount, ')');
-            console.log('  - Converted invoiceTotal:', invoiceTotal);
-            console.log('  - Payments count:', invoice.payments.length);
-            if (invoice.payments.length > 0) {
-                console.log('  - Payment details:', invoice.payments.map(p => ({
-                    amount: Number(p.amount),
-                    date: p.paymentDate
-                })));
-            }
-            console.log('  - Items count:', invoice.items?.length || 0);
-            console.log('  - Devis count:', invoice.devis?.length || 0);
-            console.log('  - Paid amount:', paidAmount);
-            console.log('  - Balance:', balance);
-            console.log('  - Return object:', JSON.stringify({
-                reference: invoice.reference,
-                totalAmount: invoiceTotal,
-                paidAmount,
-                balance
-            }));
-
-            totalInvoiced += invoiceTotal;
+            totalDevisAmount += devisTotal;
             totalPaid += paidAmount;
 
             return {
-                id: invoice.id,
-                reference: invoice.reference,
-                totalAmount: invoiceTotal,
+                id: devis.id,
+                reference: devis.reference,
+                status: devis.status,
+                totalAmount: devisTotal,
                 paidAmount,
-                balance,
-                createdAt: invoice.createdAt,
-                devisCount: invoice.devis.length,
-                payments: invoice.payments.map((p) => ({
+                remaining,
+                isFullyPaid: remaining <= 0,
+                createdAt: devis.createdAt,
+                createdBy: devis.createdBy,
+                invoice: devis.invoice,
+                lines: devis.lines.map(l => ({
+                    id: l.id,
+                    machineType: l.machineType,
+                    description: l.description,
+                    lineTotal: Number(l.lineTotal),
+                    material: l.material,
+                })),
+                services: devis.services.map(s => ({
+                    id: s.id,
+                    price: Number(s.price),
+                    service: s.service,
+                })),
+                payments: devis.payments.map((p) => ({
                     id: p.id,
                     amount: Number(p.amount),
                     paymentDate: p.paymentDate,
                     paymentMethod: p.paymentMethod,
                     reference: p.reference,
                     notes: p.notes,
+                    createdBy: p.createdBy,
                 })),
             };
         });
 
-        const pendingDevis = client.devis.map((devis) => ({
-            id: devis.id,
-            reference: devis.reference,
-            status: devis.status,
-            totalAmount: Number(devis.totalAmount),
-            createdAt: devis.createdAt,
-        }));
-
-        const result = {
+        return {
             summary: {
-                totalInvoiced,
+                totalDevisAmount,
                 totalPaid,
-                outstandingBalance: totalInvoiced - totalPaid,
-                pendingDevisTotal: pendingDevis.reduce((sum, d) => sum + d.totalAmount, 0),
+                outstandingBalance: totalDevisAmount - totalPaid,
+                devisCount: devisWithBalance.length,
+                fullyPaidCount: devisWithBalance.filter(d => d.isFullyPaid).length,
+                pendingPaymentCount: devisWithBalance.filter(d => !d.isFullyPaid && d.status === 'VALIDATED').length,
             },
-            invoices: invoicesWithBalance,
-            pendingDevis,
+            devis: devisWithBalance,
         };
-
-        console.log('\n=== FINAL BALANCE SUMMARY ===');
-        console.log('Total Invoiced:', totalInvoiced);
-        console.log('Total Paid:', totalPaid);
-        console.log('Outstanding Balance:', totalInvoiced - totalPaid);
-        console.log('Number of invoices:', invoicesWithBalance.length);
-        console.log('================================\n');
-
-        return result;
     }
 
 }

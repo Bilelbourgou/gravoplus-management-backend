@@ -34,6 +34,13 @@ export interface DashboardStats {
         expenses: number;
     }>;
     expensesByCategory: Record<string, number>;
+    unpaidClients: Array<{
+        clientId: string;
+        clientName: string;
+        totalAmount: number;
+        totalPaid: number;
+        remaining: number;
+    }>;
 }
 
 export class DashboardService {
@@ -55,13 +62,13 @@ export class DashboardService {
             prisma.invoice.count(),
         ]);
 
-        // Get revenue from all invoices (including direct invoices)
-        const allInvoices = await prisma.invoice.findMany({
-            select: { totalAmount: true },
+        // Get revenue from all payments (new devis-based flow)
+        const allPayments = await prisma.payment.findMany({
+            select: { amount: true, paymentDate: true },
         });
 
-        const totalRevenue = allInvoices.reduce(
-            (sum, inv) => sum + Number(inv.totalAmount),
+        const totalRevenue = allPayments.reduce(
+            (sum, p) => sum + Number(p.amount),
             0
         );
 
@@ -111,21 +118,7 @@ export class DashboardService {
             createdAt: d.createdAt,
         }));
 
-        // Get monthly revenue for the last 6 months
-        const sixMonthsAgo = new Date();
-        sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
-
-        const invoicesForRevenue = await prisma.invoice.findMany({
-            where: {
-                createdAt: { gte: sixMonthsAgo },
-            },
-            select: {
-                totalAmount: true,
-                createdAt: true,
-            },
-        });
-
-        // Group by month
+        // Get monthly revenue for the last 6 months (from payments)
         const revenueByMonth = new Map<string, number>();
         for (let i = 5; i >= 0; i--) {
             const date = new Date();
@@ -134,10 +127,11 @@ export class DashboardService {
             revenueByMonth.set(key, 0);
         }
 
-        for (const inv of invoicesForRevenue) {
-            const key = `${inv.createdAt.getFullYear()}-${String(inv.createdAt.getMonth() + 1).padStart(2, '0')}`;
+        for (const p of allPayments) {
+            const pDate = new Date(p.paymentDate);
+            const key = `${pDate.getFullYear()}-${String(pDate.getMonth() + 1).padStart(2, '0')}`;
             if (revenueByMonth.has(key)) {
-                revenueByMonth.set(key, (revenueByMonth.get(key) || 0) + Number(inv.totalAmount));
+                revenueByMonth.set(key, (revenueByMonth.get(key) || 0) + Number(p.amount));
             }
         }
 
@@ -205,6 +199,34 @@ export class DashboardService {
             },
         });
 
+        // Get clients with unpaid validated devis
+        const validatedDevis = await prisma.devis.findMany({
+            where: { status: { in: ['VALIDATED', 'INVOICED'] } },
+            include: {
+                client: { select: { id: true, name: true } },
+                payments: { select: { amount: true } },
+            },
+        });
+
+        const clientBalances = new Map<string, { clientName: string; totalAmount: number; totalPaid: number }>();
+        for (const d of validatedDevis) {
+            const existing = clientBalances.get(d.clientId) || { clientName: d.client.name, totalAmount: 0, totalPaid: 0 };
+            existing.totalAmount += Number(d.totalAmount);
+            existing.totalPaid += d.payments.reduce((s, p) => s + Number(p.amount), 0);
+            clientBalances.set(d.clientId, existing);
+        }
+
+        const unpaidClients = Array.from(clientBalances.entries())
+            .map(([clientId, data]) => ({
+                clientId,
+                clientName: data.clientName,
+                totalAmount: Math.round(data.totalAmount * 1000) / 1000,
+                totalPaid: Math.round(data.totalPaid * 1000) / 1000,
+                remaining: Math.round((data.totalAmount - data.totalPaid) * 1000) / 1000,
+            }))
+            .filter(c => c.remaining > 0)
+            .sort((a, b) => b.remaining - a.remaining);
+
         return {
             totalClients,
             totalEmployees,
@@ -226,6 +248,7 @@ export class DashboardService {
             monthlyRevenue,
             monthlyExpenses,
             expensesByCategory,
+            unpaidClients,
         };
     }
 }

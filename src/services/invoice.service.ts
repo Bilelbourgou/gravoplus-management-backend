@@ -140,6 +140,21 @@ export class InvoiceService {
             throw new ApiError(400, 'One or more devis already have an invoice');
         }
 
+        // Check all devis are fully paid before invoicing
+        const devisWithPayments = await prisma.devis.findMany({
+            where: { id: { in: ids } },
+            include: { payments: true },
+        });
+
+        for (const d of devisWithPayments) {
+            const totalPaid = d.payments.reduce((sum, p) => sum + Number(p.amount), 0);
+            const totalAmount = Number(d.totalAmount);
+            if (totalPaid < totalAmount) {
+                const remaining = (totalAmount - totalPaid).toFixed(3);
+                throw new ApiError(400, `Le devis ${(d as any).reference || d.id} n'est pas entièrement payé (reste ${remaining} TND)`);
+            }
+        }
+
         const reference = await this.generateReference();
         const clientId = clientIds[0];
         const totalAmount = devisList.reduce((sum, d) => sum + Number(d.totalAmount), 0);

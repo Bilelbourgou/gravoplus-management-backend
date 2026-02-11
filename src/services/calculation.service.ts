@@ -165,6 +165,16 @@ export class CalculationService {
                 materialCost = lineTotal; // It's all material cost
                 break;
 
+            case MachineType.CUSTOM:
+                // Custom: quantity × unitPrice (both provided by user)
+                if (!input.unitPrice || input.unitPrice <= 0) {
+                    throw new ApiError(400, 'Unit price is required for Custom items');
+                }
+                const customQty = input.quantity && input.quantity > 0 ? input.quantity : 1;
+                lineTotal = customQty * unitPrice;
+                breakdown = `${customQty} × ${unitPrice} TND = ${lineTotal.toFixed(2)} TND`;
+                break;
+
             default:
                 throw new ApiError(400, `Unknown machine type: ${input.machineType}`);
         }

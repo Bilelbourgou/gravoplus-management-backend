@@ -2,8 +2,10 @@ import prisma from '../config/database';
 import { ApiError } from '../middleware';
 import { notificationService } from './notification.service';
 
-interface CreatePaymentDto {
+interface CreateCaissePaymentDto {
     amount: number;
+    devisId?: string;
+    description?: string;
     paymentDate?: Date;
     paymentMethod?: string;
     reference?: string;
@@ -12,6 +14,7 @@ interface CreatePaymentDto {
 
 interface UpdatePaymentDto {
     amount?: number;
+    description?: string;
     paymentDate?: Date;
     paymentMethod?: string;
     reference?: string;
@@ -19,11 +22,76 @@ interface UpdatePaymentDto {
 }
 
 export class PaymentService {
-    async createPayment(invoiceId: string, data: CreatePaymentDto, userId?: string) {
+    /**
+     * Create a caisse payment (standalone or linked to a devis)
+     */
+    async createCaissePayment(data: CreateCaissePaymentDto, userId?: string) {
+        // If linked to a devis, verify it exists and payment doesn't exceed remaining
+        if (data.devisId) {
+            const devis = await prisma.devis.findUnique({
+                where: { id: data.devisId },
+                include: { client: true, payments: true },
+            });
+
+            if (!devis) {
+                throw new ApiError(404, 'Devis not found');
+            }
+
+            const totalPaid = devis.payments.reduce((sum, p) => sum + Number(p.amount), 0);
+            const totalAmount = Number(devis.totalAmount);
+            const remaining = totalAmount - totalPaid;
+
+            if (data.amount > remaining) {
+                throw new ApiError(400, `Le montant dépasse le reste à payer (${remaining.toFixed(3)} TND)`);
+            }
+
+            if (data.amount <= 0) {
+                throw new ApiError(400, 'Le montant doit être supérieur à 0');
+            }
+        }
+
+        const payment = await prisma.payment.create({
+            data: {
+                amount: data.amount,
+                description: data.description,
+                devisId: data.devisId || null,
+                paymentDate: data.paymentDate ? new Date(data.paymentDate) : new Date(),
+                paymentMethod: data.paymentMethod,
+                reference: data.reference,
+                notes: data.notes,
+                createdById: userId,
+            },
+            include: {
+                devis: {
+                    include: { client: { select: { name: true } } },
+                },
+                createdBy: {
+                    select: { firstName: true, lastName: true },
+                },
+            },
+        });
+
+        // Create notification
+        const clientName = payment.devis?.client?.name;
+        await notificationService.create({
+            type: 'PAYMENT_RECEIVED',
+            title: 'Paiement reçu',
+            message: `Paiement de ${Number(payment.amount).toFixed(2)} TND reçu${clientName ? ` pour ${clientName}` : ''}`,
+            entityType: 'payment',
+            entityId: payment.id,
+            triggeredById: userId,
+        });
+
+        return payment;
+    }
+
+    /**
+     * Legacy: Create payment linked to an invoice (kept for backward compat)
+     */
+    async createPayment(invoiceId: string, data: CreateCaissePaymentDto, userId?: string) {
         const invoice = await prisma.invoice.findUnique({
             where: { id: invoiceId },
             include: {
-                devis: true,
                 payments: true,
             },
         });
@@ -36,7 +104,6 @@ export class PaymentService {
             (sum, p) => sum + Number(p.amount),
             0
         );
-        // Use invoice.totalAmount directly (works for both devis-based and direct invoices)
         const totalAmount = Number(invoice.totalAmount);
         const remaining = totalAmount - totalPaid;
 
@@ -59,7 +126,6 @@ export class PaymentService {
             },
         });
 
-        // Create notification
         await notificationService.create({
             type: 'PAYMENT_RECEIVED',
             title: 'Paiement reçu',
@@ -69,6 +135,18 @@ export class PaymentService {
         });
 
         return payment;
+    }
+
+    async getPaymentsByDevis(devisId: string) {
+        return prisma.payment.findMany({
+            where: { devisId },
+            orderBy: { paymentDate: 'desc' },
+            include: {
+                createdBy: {
+                    select: { firstName: true, lastName: true },
+                },
+            },
+        });
     }
 
     async getPaymentsByInvoice(invoiceId: string) {
@@ -90,14 +168,18 @@ export class PaymentService {
         const payment = await prisma.payment.findUnique({
             where: { id: paymentId },
             include: {
+                devis: {
+                    include: {
+                        client: true,
+                    },
+                },
                 invoice: {
                     include: {
-                        devis: {
-                            include: {
-                                client: true,
-                            },
-                        },
+                        client: true,
                     },
+                },
+                createdBy: {
+                    select: { firstName: true, lastName: true },
                 },
             },
         });
@@ -112,44 +194,17 @@ export class PaymentService {
     async updatePayment(paymentId: string, data: UpdatePaymentDto) {
         const payment = await prisma.payment.findUnique({
             where: { id: paymentId },
-            include: {
-                invoice: {
-                    include: {
-                        devis: true,
-                        payments: true,
-                    },
-                },
-            },
         });
 
         if (!payment) {
             throw new ApiError(404, 'Payment not found');
         }
 
-        if (data.amount !== undefined) {
-            const otherPayments = payment.invoice.payments.filter(
-                (p) => p.id !== paymentId
-            );
-            const totalOtherPayments = otherPayments.reduce(
-                (sum, p) => sum + Number(p.amount),
-                0
-            );
-            // Use invoice.totalAmount directly (works for both devis-based and direct invoices)
-            const totalAmount = Number(payment.invoice.totalAmount);
-            const maxAllowed = totalAmount - totalOtherPayments;
-
-            if (data.amount > maxAllowed) {
-                throw new ApiError(
-                    400,
-                    `Payment amount (${data.amount}) exceeds maximum allowed (${maxAllowed})`
-                );
-            }
-        }
-
         return prisma.payment.update({
             where: { id: paymentId },
             data: {
                 amount: data.amount,
+                description: data.description,
                 paymentDate: data.paymentDate ? new Date(data.paymentDate) : undefined,
                 paymentMethod: data.paymentMethod,
                 reference: data.reference,
@@ -178,7 +233,6 @@ export class PaymentService {
         const invoice = await prisma.invoice.findUnique({
             where: { id: invoiceId },
             include: {
-                devis: true,
                 payments: true,
             },
         });
@@ -187,7 +241,6 @@ export class PaymentService {
             throw new ApiError(404, 'Invoice not found');
         }
 
-        // Use invoice.totalAmount directly (works for both devis-based and direct invoices)
         const totalAmount = Number(invoice.totalAmount);
         const totalPaid = invoice.payments.reduce(
             (sum, p) => sum + Number(p.amount),

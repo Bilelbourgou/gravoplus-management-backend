@@ -127,11 +127,11 @@ export class AuthController {
         }
     }
 
-    async deactivateUser(req: Request, res: Response, next: NextFunction) {
+    async deleteUser(req: Request, res: Response, next: NextFunction) {
         try {
             const { id } = req.params;
 
-            const result = await authService.deactivateUser(id as string);
+            const result = await authService.deleteUser(id as string);
 
             res.json({
                 success: true,

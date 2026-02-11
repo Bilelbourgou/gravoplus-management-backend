@@ -4,18 +4,63 @@ import { PrismaClient } from '@prisma/client';
 
 const prisma = new PrismaClient();
 
+// Get caisse devis with role-based filtering
+// Employee: sees own devis
+// Admin: sees employee devis
+// SuperAdmin: sees all devis (admin + employee) with full details
+export const getCaisseDevis = async (req: Request, res: Response) => {
+  try {
+    const userId = req.user?.id;
+    const userRole = req.user?.role;
+
+    const where: any = { status: 'VALIDATED' };
+
+    if (userRole === 'EMPLOYEE') {
+      where.createdById = userId;
+    }
+    // ADMIN and SUPERADMIN see all devis (no filter)
+
+    const devis = await prisma.devis.findMany({
+      where,
+      orderBy: { createdAt: 'desc' },
+      include: {
+        client: true,
+        createdBy: {
+          select: { id: true, firstName: true, lastName: true, role: true },
+        },
+        lines: {
+          include: { material: true },
+          orderBy: { createdAt: 'asc' },
+        },
+        services: {
+          include: { service: true },
+        },
+        invoice: {
+          select: { id: true, reference: true, createdAt: true },
+        },
+        payments: {
+          select: { id: true, amount: true, paymentDate: true, paymentMethod: true, reference: true, createdBy: { select: { firstName: true, lastName: true } } },
+          orderBy: { paymentDate: 'desc' },
+        },
+      },
+    });
+
+    res.json({
+      success: true,
+      data: devis,
+    });
+  } catch (error) {
+    console.error('Error fetching caisse devis:', error);
+    res.status(500).json({ success: false, error: 'Error fetching caisse devis' });
+  }
+};
+
 // Get current financial stats (since last closure of relevant scope)
 export const getFinancialStats = async (req: Request, res: Response) => {
   try {
     const userRole = req.user?.role;
-    // Admin closes Employee sessions (EMPLOYEE_LEVEL)
-    // Superadmin closes Admin sessions (ADMIN_LEVEL)
-    const closureScope = userRole === 'SUPERADMIN' ? 'ADMIN_LEVEL' : 'EMPLOYEE_LEVEL';
-
-    // Target roles for transactions
-    // If Admin is viewing, they want to see Employee transactions
-    // If Superadmin is viewing, they want to see ALL transactions (Employee, Admin, Superadmin)
-    const targetRoles = userRole === 'SUPERADMIN' ? ['EMPLOYEE', 'ADMIN', 'SUPERADMIN'] : ['EMPLOYEE'];
+    const closureScope = 'ADMIN_LEVEL';
+    const targetRoles = ['EMPLOYEE', 'ADMIN', 'SUPERADMIN'];
 
     // Find the last closure of this specific scope
     const lastClosure = await prisma.financialClosure.findFirst({
@@ -39,6 +84,11 @@ export const getFinancialStats = async (req: Request, res: Response) => {
       },
       include: {
         invoice: {
+          include: {
+            client: { select: { name: true } }
+          }
+        },
+        devis: {
           include: {
             client: { select: { name: true } }
           }
@@ -123,8 +173,8 @@ export const createClosure = async (req: Request, res: Response) => {
       return res.status(401).json({ message: 'Unauthorized' });
     }
 
-    const closureScope = userRole === 'SUPERADMIN' ? 'ADMIN_LEVEL' : 'EMPLOYEE_LEVEL';
-    const targetRoles = userRole === 'SUPERADMIN' ? ['ADMIN', 'SUPERADMIN'] : ['EMPLOYEE'];
+    const closureScope = 'ADMIN_LEVEL';
+    const targetRoles = ['EMPLOYEE', 'ADMIN', 'SUPERADMIN'];
 
     // Find last closure of this scope to determine start date
     const lastClosure = await prisma.financialClosure.findFirst({
@@ -182,10 +232,8 @@ export const createClosure = async (req: Request, res: Response) => {
 export const getClosureHistory = async (req: Request, res: Response) => {
   try {
     const userRole = req.user?.role;
-    // Show history relevant to the user's closure authority
-    // Superadmin sees ADMIN_LEVEL closures (closures made BY Superadmins)
-    // Admin sees EMPLOYEE_LEVEL closures (closures made BY Admins)
-    const closureScope = userRole === 'SUPERADMIN' ? 'ADMIN_LEVEL' : 'EMPLOYEE_LEVEL';
+    // Both ADMIN and SUPERADMIN see ADMIN_LEVEL closures
+    const closureScope = 'ADMIN_LEVEL';
 
     const closures = await prisma.financialClosure.findMany({
       where: { scope: closureScope },

@@ -1,6 +1,6 @@
 
 import prisma from '../config/database';
-import { CreateDevisDto, AddDevisLineDto, AddDevisServiceDto, DevisStatus, UserRole } from '../types';
+import { CreateDevisDto, AddDevisLineDto, AddDevisServiceDto, DevisStatus, UserRole, CreateCustomDevisDto, MachineType } from '../types';
 import { ApiError } from '../middleware';
 import { calculationService } from './calculation.service';
 import { notificationService } from './notification.service';
@@ -165,6 +165,94 @@ export class DevisService {
             message: `Devis ${devis.reference} créé pour ${client.name}`,
             entityType: 'devis',
             entityId: devis.id,
+            triggeredById: userId,
+        });
+
+        return devis;
+    }
+
+    /**
+     * Create custom devis with multiple items (Admin only)
+     */
+    async createCustomDevis(userId: string, data: CreateCustomDevisDto) {
+        // Verify client exists
+        const client = await prisma.client.findUnique({
+            where: { id: data.clientId },
+        });
+
+        if (!client) {
+            throw new ApiError(404, 'Client not found');
+        }
+
+        // Verify user exists
+        const user = await prisma.user.findUnique({
+            where: { id: userId },
+        });
+
+        if (!user) {
+            throw new ApiError(401, 'User session expired. Please log in again.');
+        }
+
+        if (data.items.length === 0) {
+            throw new ApiError(400, 'At least one item is required');
+        }
+
+        const reference = await this.generateReference();
+
+        // Calculate total amount
+        let totalAmount = 0;
+        const linesData = data.items.map(item => {
+            const lineTotal = item.quantity * item.unitPrice;
+            totalAmount += lineTotal;
+            return {
+                machineType: MachineType.CUSTOM,
+                description: item.description,
+                quantity: item.quantity,
+                unitPrice: item.unitPrice,
+                materialCost: 0,
+                lineTotal,
+            };
+        });
+
+        // Create devis with all lines in a transaction
+        const devis = await prisma.$transaction(async (tx) => {
+            const newDevis = await tx.devis.create({
+                data: {
+                    reference,
+                    clientId: data.clientId,
+                    createdById: userId,
+                    notes: data.notes,
+                    totalAmount,
+                },
+            });
+
+            // Create all lines
+            await tx.devisLine.createMany({
+                data: linesData.map(line => ({
+                    ...line,
+                    devisId: newDevis.id,
+                })),
+            });
+
+            return tx.devis.findUnique({
+                where: { id: newDevis.id },
+                include: {
+                    client: true,
+                    createdBy: {
+                        select: { id: true, firstName: true, lastName: true },
+                    },
+                    lines: true,
+                },
+            });
+        });
+
+        // Create notification
+        await notificationService.create({
+            type: 'DEVIS_CREATED',
+            title: 'Nouveau devis personnalisé',
+            message: `Devis ${reference} créé pour ${client.name}`,
+            entityType: 'devis',
+            entityId: devis!.id,
             triggeredById: userId,
         });
 

@@ -11,6 +11,7 @@ export enum MachineType {
     PANNEAUX = 'PANNEAUX',
     SERVICE_MAINTENANCE = 'SERVICE_MAINTENANCE',
     VENTE_MATERIAU = 'VENTE_MATERIAU',
+    CUSTOM = 'CUSTOM',
 }
 
 export enum DevisStatus {
@@ -103,4 +104,16 @@ export interface ApiResponse<T = unknown> {
     data?: T;
     message?: string;
     error?: string;
+}
+
+export interface CustomDevisItemDto {
+    description: string;
+    quantity: number;
+    unitPrice: number;
+}
+
+export interface CreateCustomDevisDto {
+    clientId: string;
+    items: CustomDevisItemDto[];
+    notes?: string;
 }

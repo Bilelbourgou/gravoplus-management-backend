@@ -25,6 +25,7 @@ router.delete('/:id/services/:serviceId', isEmployeeOrAdmin, devisController.rem
 router.patch('/:id/notes', isEmployeeOrAdmin, devisController.updateNotes.bind(devisController));
 
 // Admin only routes
+router.post('/custom', isAdmin, devisController.createCustomDevis.bind(devisController));
 router.post('/:id/validate', isAdmin, devisController.validate.bind(devisController));
 router.post('/:id/cancel', isAdmin, devisController.cancel.bind(devisController));
 router.delete('/:id', isAdmin, devisController.delete.bind(devisController));

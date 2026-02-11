@@ -124,6 +124,7 @@ model Devis {
   
   lines         DevisLine[]
   services      DevisService[]
+  payments      Payment[]     @relation("PaymentDevis")
   
   invoiceId     String?
   invoice       Invoice?  @relation(fields: [invoiceId], references: [id], onDelete: SetNull)
@@ -213,6 +214,7 @@ model InvoiceItem {
 model Payment {
   id            String    @id @default(uuid())
   amount        Decimal
+  description   String?   // Description for standalone caisse entries
   paymentDate   DateTime  @default(now())
   paymentMethod String?   // "Cash", "Check", "Bank Transfer", "Credit Card", etc.
   reference     String?   // Check number, transaction ID, etc.
@@ -220,12 +222,14 @@ model Payment {
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
   
-  // Relations
-  invoiceId     String
-  invoice       Invoice   @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  // Relations - all optional to support standalone caisse entries
+  invoiceId     String?
+  invoice       Invoice?  @relation(fields: [invoiceId], references: [id], onDelete: SetNull)
 
-  createdById   String?   // Helper: Make nullable initially to avoid migration errors on existing data, or default if possible. Better to be optional for now or handle via migration script. 
-                          // Actually, we can make it optional for existing data compatibility.
+  devisId       String?
+  devis         Devis?    @relation("PaymentDevis", fields: [devisId], references: [id], onDelete: SetNull)
+
+  createdById   String?
   createdBy     User?     @relation("PaymentCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
   
   @@map("payments")
