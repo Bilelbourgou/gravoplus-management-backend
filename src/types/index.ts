@@ -85,6 +85,7 @@ export interface CalculationInput {
     meters?: number;
     quantity?: number;
     materialId?: string;
+    serviceId?: string;
     unitPrice?: number;
     width?: number;
     height?: number;

@@ -118,11 +118,36 @@ export class CalculationService {
                 break;
 
             case MachineType.SERVICE_MAINTENANCE:
-                // Service Maintenance: quantity × unitPrice
-                // Default quantity to 1 if not provided
-                const qty = input.quantity && input.quantity > 0 ? input.quantity : 1;
-                lineTotal = qty * unitPrice;
-                breakdown = `${qty} ${qty > 1 ? 'services' : 'service'} × ${unitPrice} TND = ${lineTotal.toFixed(2)} TND`;
+                // Service Maintenance: can use material, fixed service, or manual price
+                const maintenanceQty = input.quantity && input.quantity > 0 ? input.quantity : 1;
+
+                if (input.materialId) {
+                    // Using material - calculate based on material price × quantity
+                    const maintenanceMaterial = await prisma.material.findUnique({
+                        where: { id: input.materialId },
+                    });
+                    if (!maintenanceMaterial) {
+                        throw new ApiError(404, 'Material not found');
+                    }
+                    const materialPrice = Number(maintenanceMaterial.pricePerUnit);
+                    lineTotal = maintenanceQty * materialPrice;
+                    breakdown = `${maintenanceMaterial.name}: ${maintenanceQty} ${maintenanceMaterial.unit} × ${materialPrice.toFixed(2)} TND = ${lineTotal.toFixed(2)} TND`;
+                } else if (input.serviceId) {
+                    // Using fixed service - calculate based on service price × quantity
+                    const fixedService = await prisma.fixedService.findUnique({
+                        where: { id: input.serviceId },
+                    });
+                    if (!fixedService) {
+                        throw new ApiError(404, 'Service not found');
+                    }
+                    const servicePrice = Number(fixedService.price);
+                    lineTotal = maintenanceQty * servicePrice;
+                    breakdown = `${fixedService.name}: ${maintenanceQty} × ${servicePrice.toFixed(2)} TND = ${lineTotal.toFixed(2)} TND`;
+                } else {
+                    // Manual price entry
+                    lineTotal = maintenanceQty * unitPrice;
+                    breakdown = `${maintenanceQty} ${maintenanceQty > 1 ? 'services' : 'service'} × ${unitPrice} TND = ${lineTotal.toFixed(2)} TND`;
+                }
                 break;
 
             case MachineType.VENTE_MATERIAU:
