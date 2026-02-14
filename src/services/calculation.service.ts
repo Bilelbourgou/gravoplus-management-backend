@@ -190,6 +190,36 @@ export class CalculationService {
                 materialCost = lineTotal; // It's all material cost
                 break;
 
+            case MachineType.PLIAGE:
+                // Pliage: (machine meters × machinePrice) + (material meters × materialPrice)
+                if (!input.meters || input.meters <= 0) {
+                    throw new ApiError(400, 'Les mètres de la machine sont requis pour le calcul Pliage');
+                }
+
+                let materialUnitPrice = 0;
+                let materialName = '';
+                if (input.materialId) {
+                    const material = await prisma.material.findUnique({
+                        where: { id: input.materialId },
+                    });
+                    if (material) {
+                        materialUnitPrice = Number(material.pricePerUnit);
+                        materialName = material.name;
+                    }
+                }
+
+                const materialMeters = input.quantity && input.quantity > 0 ? input.quantity : 0;
+                const machineCost = input.meters * unitPrice;
+                materialCost = materialMeters * materialUnitPrice;
+                lineTotal = machineCost + materialCost;
+
+                breakdown = `${input.meters} m machine × ${unitPrice} TND/m`;
+                if (materialMeters > 0) {
+                    breakdown += ` + ${materialMeters} m ${materialName || 'matériau'} × ${materialUnitPrice} TND/m`;
+                }
+                breakdown += ` = ${lineTotal.toFixed(2)} TND`;
+                break;
+
             case MachineType.CUSTOM:
                 // Custom: quantity × unitPrice (both provided by user)
                 if (!input.unitPrice || input.unitPrice <= 0) {

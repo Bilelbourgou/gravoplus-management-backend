@@ -5,6 +5,7 @@ import cors from 'cors';
 import helmet from 'helmet';
 import { config } from './config';
 import routes from './routes';
+import { machineService } from './services/machine.service';
 import { errorHandler, notFoundHandler } from './middleware';
 import { setupSocketIO } from './socket';
 
@@ -46,6 +47,11 @@ httpServer.listen(config.port, () => {
     console.log(`🚀 Server running on port ${config.port}`);
     console.log(`📝 Environment: ${config.env}`);
     console.log(`🔗 CORS origins: ${config.cors.origin.join(', ')}`);
+
+    // Initialize default machine pricing
+    machineService.initializeDefaultPricing()
+        .then(() => console.log('✅ Default machine pricing initialized'))
+        .catch(err => console.error('❌ Failed to initialize machine pricing:', err));
 });
 
 export { app, io };

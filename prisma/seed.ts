@@ -51,6 +51,7 @@ async function main() {
         { machineType: 'LASER' as const, pricePerUnit: 2.0, description: 'Prix par minute (TND)' },
         { machineType: 'CHAMPS' as const, pricePerUnit: 5.0, description: 'Prix par mètre (TND)' },
         { machineType: 'PANNEAUX' as const, pricePerUnit: 25.0, description: 'Prix par unité (TND)' },
+        { machineType: 'PLIAGE' as const, pricePerUnit: 3.0, description: 'Prix par mètre (TND)' },
     ];
 
     for (const pricing of machineTypes) {

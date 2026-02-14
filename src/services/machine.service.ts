@@ -51,6 +51,7 @@ export class MachineService {
             { machineType: MachineType.CHAMPS, pricePerUnit: 5.0, description: 'Prix par mètre' },
             { machineType: MachineType.PANNEAUX, pricePerUnit: 25.0, description: 'Prix par unité' },
             { machineType: MachineType.SERVICE_MAINTENANCE, pricePerUnit: 50.0, description: 'Prix forfaitaire' },
+            { machineType: MachineType.PLIAGE, pricePerUnit: 3.0, description: 'Prix par mètre' },
         ];
 
         for (const pricing of defaults) {
