@@ -12,6 +12,7 @@ import dashboardRoutes from './dashboard.routes';
 import expenseRoutes from './expense.routes';
 import notificationRoutes from './notification.routes';
 import financialRoutes from './financialClosure.routes';
+import rapportRoutes from './rapport.routes';
 
 const router = Router();
 
@@ -28,6 +29,7 @@ router.use('/dashboard', dashboardRoutes);
 router.use('/expenses', expenseRoutes);
 router.use('/notifications', notificationRoutes);
 router.use('/financial', financialRoutes);
+router.use('/rapport', rapportRoutes);
 
 // Health check
 router.get('/health', (_req, res) => {
