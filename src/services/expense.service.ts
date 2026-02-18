@@ -49,7 +49,7 @@ export class ExpenseService {
         const where: any = {};
 
         if (filters?.category) {
-            where.category = filters.category;
+            where.categoryName = filters.category;
         }
 
         if (filters?.startDate || filters?.endDate) {
@@ -71,6 +71,7 @@ export class ExpenseService {
             where,
             orderBy: { date: 'desc' },
             include: {
+                category: true,
                 createdBy: {
                     select: {
                         id: true,
@@ -89,6 +90,7 @@ export class ExpenseService {
         const expense = await prisma.expense.findUnique({
             where: { id: expenseId },
             include: {
+                category: true,
                 createdBy: {
                     select: {
                         id: true,
@@ -114,13 +116,14 @@ export class ExpenseService {
             data: {
                 description: data.description,
                 amount: data.amount,
-                category: ExpenseService.normalizeCategory(data.category),
+                categoryName: data.category,
                 date: data.date || new Date(),
                 reference: data.reference,
                 notes: data.notes,
                 createdById: userId,
             },
             include: {
+                category: true,
                 createdBy: {
                     select: {
                         id: true,
@@ -161,12 +164,13 @@ export class ExpenseService {
             data: {
                 description: data.description,
                 amount: data.amount,
-                category: data.category ? ExpenseService.normalizeCategory(data.category) : undefined,
+                categoryName: data.category,
                 date: data.date,
                 reference: data.reference,
                 notes: data.notes,
             },
             include: {
+                category: true,
                 createdBy: {
                     select: {
                         id: true,
@@ -222,7 +226,7 @@ export class ExpenseService {
             where,
             select: {
                 amount: true,
-                category: true,
+                categoryName: true,
             },
         });
 
@@ -230,10 +234,10 @@ export class ExpenseService {
 
         const byCategory: Record<string, number> = {};
         expenses.forEach((expense) => {
-            if (!byCategory[expense.category]) {
-                byCategory[expense.category] = 0;
+            if (!byCategory[expense.categoryName]) {
+                byCategory[expense.categoryName] = 0;
             }
-            byCategory[expense.category] += Number(expense.amount);
+            byCategory[expense.categoryName] += Number(expense.amount);
         });
 
         return {

@@ -75,7 +75,7 @@ export class DashboardService {
 
         // Get total expenses
         const allExpenses = await prisma.expense.findMany({
-            select: { amount: true, category: true, date: true },
+            select: { amount: true, categoryName: true, date: true },
         });
 
         const totalExpenses = allExpenses.reduce(
@@ -88,8 +88,7 @@ export class DashboardService {
         // Get expenses by category
         const expensesByCategory: Record<string, number> = {};
         for (const e of allExpenses) {
-            const normalizedCat = ExpenseService.normalizeCategory(e.category);
-            expensesByCategory[normalizedCat] = (expensesByCategory[normalizedCat] || 0) + Number(e.amount);
+            expensesByCategory[e.categoryName] = (expensesByCategory[e.categoryName] || 0) + Number(e.amount);
         }
 
         // Get devis by status

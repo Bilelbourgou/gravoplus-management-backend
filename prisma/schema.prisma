@@ -236,21 +236,35 @@ model Payment {
 }
 
 model Expense {
-  id            String    @id @default(uuid())
+  id            String          @id @default(uuid())
   description   String
   amount        Decimal
-  category      String    // "Matériel", "Fournitures", "Transport", "Maintenance", "Salaires", "Loyer", "Électricité", "Autre"
-  date          DateTime  @default(now())
-  reference     String?   // Receipt number, invoice number, etc.
+  categoryName  String          // Field to store the name for legacy/fallback
+  category      ExpenseCategory @relation(fields: [categoryName], references: [name])
+  date          DateTime        @default(now())
+  reference     String?         // Receipt number, invoice number, etc.
   notes         String?
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
   
   // Relations
   createdById   String
   createdBy     User      @relation("ExpenseCreatedBy", fields: [createdById], references: [id], onDelete: Cascade)
   
   @@map("expenses")
+}
+
+model ExpenseCategory {
+  id        String    @id @default(uuid())
+  name      String    @unique
+  color     String?   @default("#6c757d")
+  icon      String?   @default("Package")
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  expenses  Expense[]
+
+  @@map("expense_categories")
 }
 
 model Notification {
