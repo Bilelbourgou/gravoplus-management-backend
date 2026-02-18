@@ -1,4 +1,5 @@
 import prisma from '../config/database';
+import { ExpenseService } from './expense.service';
 
 export interface DashboardStats {
     totalClients: number;
@@ -87,7 +88,8 @@ export class DashboardService {
         // Get expenses by category
         const expensesByCategory: Record<string, number> = {};
         for (const e of allExpenses) {
-            expensesByCategory[e.category] = (expensesByCategory[e.category] || 0) + Number(e.amount);
+            const normalizedCat = ExpenseService.normalizeCategory(e.category);
+            expensesByCategory[normalizedCat] = (expensesByCategory[normalizedCat] || 0) + Number(e.amount);
         }
 
         // Get devis by status

@@ -14,6 +14,35 @@ export interface CreateExpenseDto {
 
 export class ExpenseService {
     /**
+     * Normalize category names (English to French)
+     */
+    static normalizeCategory(category: string): string {
+        const mapping: Record<string, string> = {
+            'MATERIAL': 'Matériel',
+            'FOURNITURES': 'Fournitures',
+            'SUPPLIES': 'Fournitures',
+            'TRANSPORT': 'Transport',
+            'MAINTENANCE': 'Maintenance',
+            'SALARIES': 'Salaires',
+            'LOYER': 'Loyer',
+            'RENT': 'Loyer',
+            'ÉLECTRICITÉ': 'Électricité',
+            'ELECTRICITY': 'Électricité',
+            'AUTRE': 'Autre',
+            'OTHER': 'Autre',
+            'EQUIPMENT': 'Maintenance',
+            'UTILITIES': 'Électricité',
+            'SALARY': 'Salaires',
+            'Materiel': 'Matériel',
+            'Electricite': 'Électricité',
+            'Equipement': 'Maintenance',
+        };
+
+        const upper = category.toUpperCase();
+        return mapping[upper] || category;
+    }
+
+    /**
      * Get all expenses with optional filters
      */
     async getAllExpenses(filters?: { category?: string; startDate?: Date; endDate?: Date; excludeSuperadmin?: boolean }) {
@@ -85,7 +114,7 @@ export class ExpenseService {
             data: {
                 description: data.description,
                 amount: data.amount,
-                category: data.category,
+                category: ExpenseService.normalizeCategory(data.category),
                 date: data.date || new Date(),
                 reference: data.reference,
                 notes: data.notes,
@@ -132,7 +161,7 @@ export class ExpenseService {
             data: {
                 description: data.description,
                 amount: data.amount,
-                category: data.category,
+                category: data.category ? ExpenseService.normalizeCategory(data.category) : undefined,
                 date: data.date,
                 reference: data.reference,
                 notes: data.notes,
