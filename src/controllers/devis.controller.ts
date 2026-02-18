@@ -239,6 +239,22 @@ export class DevisController {
         }
     }
 
+    async updateStatus(req: Request, res: Response, next: NextFunction) {
+        try {
+            const { id } = req.params;
+            const { status } = req.body;
+
+            const devis = await devisService.updateStatus(id as string, status as DevisStatus);
+
+            res.json({
+                success: true,
+                data: devis,
+            });
+        } catch (error) {
+            next(error);
+        }
+    }
+
     async delete(req: Request, res: Response, next: NextFunction) {
         try {
             const { id } = req.params;

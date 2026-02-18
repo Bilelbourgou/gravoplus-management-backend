@@ -534,8 +534,39 @@ export class DevisService {
         await prisma.devis.delete({
             where: { id: devisId },
         });
-
         return { success: true, message: 'Devis deleted successfully' };
+    }
+
+    /**
+     * Update devis status (Superadmin override)
+     */
+    async updateStatus(devisId: string, status: DevisStatus) {
+        const devis = await prisma.devis.findUnique({
+            where: { id: devisId },
+        });
+
+        if (!devis) {
+            throw new ApiError(404, 'Devis not found');
+        }
+
+        // Validate status
+        if (!Object.values(DevisStatus).includes(status)) {
+            throw new ApiError(400, 'Invalid status');
+        }
+
+        const data: any = { status };
+
+        // If moving back to DRAFT from VALIDATED, we might want to clear validatedAt?
+        // Actually, just let the superadmin override strictly as requested.
+        if (status === DevisStatus.VALIDATED && !devis.validatedAt) {
+            data.validatedAt = new Date();
+        }
+
+        return prisma.devis.update({
+            where: { id: devisId },
+            data,
+            include: { client: true },
+        });
     }
 
     /**

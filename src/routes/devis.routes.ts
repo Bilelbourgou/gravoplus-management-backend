@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { devisController } from '../controllers';
-import { authenticate, isAdmin, isEmployeeOrAdmin } from '../middleware';
+import { authenticate, isAdmin, isEmployeeOrAdmin, isSuperAdmin } from '../middleware';
 
 const router = Router();
 
@@ -28,6 +28,7 @@ router.patch('/:id/notes', isEmployeeOrAdmin, devisController.updateNotes.bind(d
 router.post('/custom', isAdmin, devisController.createCustomDevis.bind(devisController));
 router.post('/:id/validate', isAdmin, devisController.validate.bind(devisController));
 router.post('/:id/cancel', isAdmin, devisController.cancel.bind(devisController));
+router.patch('/:id/status', isSuperAdmin, devisController.updateStatus.bind(devisController));
 router.delete('/:id', isAdmin, devisController.delete.bind(devisController));
 
 export default router;
