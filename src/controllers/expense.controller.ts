@@ -1,15 +1,23 @@
 import { Request, Response, NextFunction } from 'express';
 import { expenseService } from '../services/expense.service';
+import { UserRole } from '../types';
 
 export class ExpenseController {
     async getAll(req: Request, res: Response, next: NextFunction) {
         try {
             const { category, startDate, endDate } = req.query;
+            const userRole = (req as any).user?.role;
 
             const filters: any = {};
             if (category) filters.category = category as string;
             if (startDate) filters.startDate = new Date(startDate as string);
             if (endDate) filters.endDate = new Date(endDate as string);
+
+            // Admin should not see superadmin-created expenses
+
+            if (userRole === UserRole.ADMIN) {
+                filters.excludeSuperadmin = true;
+            }
 
             const expenses = await expenseService.getAllExpenses(
                 Object.keys(filters).length > 0 ? filters : undefined
@@ -67,12 +75,26 @@ export class ExpenseController {
                 return;
             }
 
+            let expenseDate = date ? new Date(date) : new Date();
+
+            // Midnight Fix: If the provided date is today (same YYYY-MM-DD), 
+            // preserve the current time to ensure it follows the last closure.
+            if (date) {
+                const now = new Date();
+                const providedDate = new Date(date);
+                if (providedDate.getUTCFullYear() === now.getUTCFullYear() &&
+                    providedDate.getUTCMonth() === now.getUTCMonth() &&
+                    providedDate.getUTCDate() === now.getUTCDate()) {
+                    expenseDate = now;
+                }
+            }
+
             const expense = await expenseService.createExpense(
                 {
                     description,
                     amount: parseFloat(amount),
                     category,
-                    date: date ? new Date(date) : undefined,
+                    date: expenseDate,
                     reference,
                     notes,
                 },
@@ -93,11 +115,23 @@ export class ExpenseController {
             const { id } = req.params;
             const { description, amount, category, date, reference, notes } = req.body;
 
+            let expenseDate = date ? new Date(date) : undefined;
+
+            if (date) {
+                const now = new Date();
+                const providedDate = new Date(date);
+                if (providedDate.getUTCFullYear() === now.getUTCFullYear() &&
+                    providedDate.getUTCMonth() === now.getUTCMonth() &&
+                    providedDate.getUTCDate() === now.getUTCDate()) {
+                    expenseDate = now;
+                }
+            }
+
             const expense = await expenseService.updateExpense(id as string, {
                 description,
                 amount: amount ? parseFloat(amount) : undefined,
                 category,
-                date: date ? new Date(date) : undefined,
+                date: expenseDate,
                 reference,
                 notes,
             });
@@ -128,10 +162,12 @@ export class ExpenseController {
     async getStats(req: Request, res: Response, next: NextFunction) {
         try {
             const { startDate, endDate } = req.query;
+            const userRole = (req as any).user?.role;
 
             const stats = await expenseService.getExpenseStats(
                 startDate ? new Date(startDate as string) : undefined,
-                endDate ? new Date(endDate as string) : undefined
+                endDate ? new Date(endDate as string) : undefined,
+                userRole === UserRole.ADMIN
             );
 
             res.json({

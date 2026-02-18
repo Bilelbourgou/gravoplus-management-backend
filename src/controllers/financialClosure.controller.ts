@@ -1,8 +1,7 @@
 
 import { Request, Response } from 'express';
-import { PrismaClient } from '@prisma/client';
-
-const prisma = new PrismaClient();
+import prisma from '../config/database';
+import { UserRole } from '../types';
 
 // Get caisse devis with role-based filtering
 // Employee: sees own devis
@@ -11,14 +10,17 @@ const prisma = new PrismaClient();
 export const getCaisseDevis = async (req: Request, res: Response) => {
   try {
     const userId = req.user?.id;
-    const userRole = req.user?.role;
+    const userRole = req.user?.role as UserRole;
 
     const where: any = { status: 'VALIDATED' };
 
-    if (userRole === 'EMPLOYEE') {
+    if (userRole === UserRole.EMPLOYEE) {
       where.createdById = userId;
+    } else if (userRole === UserRole.ADMIN) {
+      // Admin should not see devis created by superadmin
+      where.createdBy = { role: { not: UserRole.SUPERADMIN } };
     }
-    // ADMIN and SUPERADMIN see all devis (no filter)
+    // SUPERADMIN sees all devis (no filter)
 
     const devis = await prisma.devis.findMany({
       where,
@@ -58,9 +60,10 @@ export const getCaisseDevis = async (req: Request, res: Response) => {
 // Get current financial stats (since last closure of relevant scope)
 export const getFinancialStats = async (req: Request, res: Response) => {
   try {
-    const userRole = req.user?.role;
+    const userRole = req.user?.role as UserRole;
     const closureScope = 'ADMIN_LEVEL';
-    const targetRoles = ['EMPLOYEE', 'ADMIN', 'SUPERADMIN'];
+    // Admin should not see superadmin-created data
+    const targetRoles = userRole === UserRole.ADMIN ? [UserRole.EMPLOYEE, UserRole.ADMIN] : [UserRole.EMPLOYEE, UserRole.ADMIN, UserRole.SUPERADMIN];
 
     // Find the last closure of this specific scope
     const lastClosure = await prisma.financialClosure.findFirst({
@@ -75,7 +78,7 @@ export const getFinancialStats = async (req: Request, res: Response) => {
     const payments = await prisma.payment.findMany({
       where: {
         paymentDate: {
-          gt: startDate,
+          gte: startDate,
           lte: endDate,
         },
         createdBy: {
@@ -104,7 +107,7 @@ export const getFinancialStats = async (req: Request, res: Response) => {
     const expenses = await prisma.expense.findMany({
       where: {
         date: {
-          gt: startDate,
+          gte: startDate,
           lte: endDate,
         },
         createdBy: {
@@ -167,14 +170,14 @@ export const createClosure = async (req: Request, res: Response) => {
   try {
     const { notes } = req.body;
     const userId = req.user?.id;
-    const userRole = req.user?.role;
-
+    const userRole = req.user?.role as UserRole;
     if (!userId) {
       return res.status(401).json({ message: 'Unauthorized' });
     }
 
     const closureScope = 'ADMIN_LEVEL';
-    const targetRoles = ['EMPLOYEE', 'ADMIN', 'SUPERADMIN'];
+    // Admin should not see superadmin-created data
+    const targetRoles = userRole === UserRole.ADMIN ? [UserRole.EMPLOYEE, UserRole.ADMIN] : [UserRole.EMPLOYEE, UserRole.ADMIN, UserRole.SUPERADMIN];
 
     // Find last closure of this scope to determine start date
     const lastClosure = await prisma.financialClosure.findFirst({
@@ -189,7 +192,7 @@ export const createClosure = async (req: Request, res: Response) => {
     const incomeResult = await prisma.payment.aggregate({
       _sum: { amount: true },
       where: {
-        paymentDate: { gt: startDate, lte: endDate },
+        paymentDate: { gte: startDate, lte: endDate },
         createdBy: { role: { in: targetRoles } }
       },
     });
@@ -198,7 +201,7 @@ export const createClosure = async (req: Request, res: Response) => {
     const expenseResult = await prisma.expense.aggregate({
       _sum: { amount: true },
       where: {
-        date: { gt: startDate, lte: endDate },
+        date: { gte: startDate, lte: endDate },
         createdBy: { role: { in: targetRoles } }
       },
     });
@@ -231,7 +234,7 @@ export const createClosure = async (req: Request, res: Response) => {
 // Get closure history
 export const getClosureHistory = async (req: Request, res: Response) => {
   try {
-    const userRole = req.user?.role;
+    const userRole = req.user?.role as UserRole;
     // Both ADMIN and SUPERADMIN see ADMIN_LEVEL closures
     const closureScope = 'ADMIN_LEVEL';
 

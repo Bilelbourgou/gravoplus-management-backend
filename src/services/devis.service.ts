@@ -50,6 +50,9 @@ export class DevisService {
         // Employees can only see their own devis
         if (role === UserRole.EMPLOYEE) {
             where.createdById = userId;
+        } else if (role === UserRole.ADMIN) {
+            // Admin should not see devis created by superadmin
+            where.createdBy = { role: { not: UserRole.SUPERADMIN } };
         }
 
         if (filters?.clientId) {

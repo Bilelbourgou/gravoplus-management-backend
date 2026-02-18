@@ -1,6 +1,7 @@
 import prisma from '../config/database';
 import { ApiError } from '../middleware';
 import { notificationService } from './notification.service';
+import { UserRole } from '../types';
 
 export interface CreateExpenseDto {
     description: string;
@@ -15,7 +16,7 @@ export class ExpenseService {
     /**
      * Get all expenses with optional filters
      */
-    async getAllExpenses(filters?: { category?: string; startDate?: Date; endDate?: Date }) {
+    async getAllExpenses(filters?: { category?: string; startDate?: Date; endDate?: Date; excludeSuperadmin?: boolean }) {
         const where: any = {};
 
         if (filters?.category) {
@@ -30,6 +31,11 @@ export class ExpenseService {
             if (filters.endDate) {
                 where.date.lte = filters.endDate;
             }
+        }
+
+        // Exclude expenses created by superadmin (for admin users)
+        if (filters?.excludeSuperadmin) {
+            where.createdBy = { role: { not: UserRole.SUPERADMIN } };
         }
 
         return prisma.expense.findMany({
@@ -165,7 +171,7 @@ export class ExpenseService {
     /**
      * Get expense statistics
      */
-    async getExpenseStats(startDate?: Date, endDate?: Date) {
+    async getExpenseStats(startDate?: Date, endDate?: Date, excludeSuperadmin?: boolean) {
         const where: any = {};
 
         if (startDate || endDate) {
@@ -176,6 +182,11 @@ export class ExpenseService {
             if (endDate) {
                 where.date.lte = endDate;
             }
+        }
+
+        // Exclude expenses created by superadmin (for admin users)
+        if (excludeSuperadmin) {
+            where.createdBy = { role: { not: UserRole.SUPERADMIN } };
         }
 
         const expenses = await prisma.expense.findMany({
