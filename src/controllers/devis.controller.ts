@@ -304,6 +304,22 @@ export class DevisController {
             next(error);
         }
     }
+    async downloadPDF(req: Request, res: Response, next: NextFunction) {
+        try {
+            const { id } = req.params;
+            const pdfBuffer = await devisService.generateDevisPDF(id as string);
+            const devis = await devisService.getDevisById(id as string);
+
+            res.setHeader('Content-Type', 'application/pdf');
+            res.setHeader(
+                'Content-Disposition',
+                `attachment; filename="${devis.reference}.pdf"`
+            );
+            res.send(pdfBuffer);
+        } catch (error) {
+            next(error);
+        }
+    }
 }
 
 export const devisController = new DevisController();

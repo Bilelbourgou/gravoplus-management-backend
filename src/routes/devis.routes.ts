@@ -10,6 +10,7 @@ router.use(authenticate);
 // Routes accessible by all authenticated users
 router.get('/', isEmployeeOrAdmin, devisController.getAll.bind(devisController));
 router.get('/:id', isEmployeeOrAdmin, devisController.getById.bind(devisController));
+router.get('/:id/pdf', isEmployeeOrAdmin, devisController.downloadPDF.bind(devisController));
 router.post('/', isEmployeeOrAdmin, devisController.create.bind(devisController));
 router.post('/calculate', isEmployeeOrAdmin, devisController.calculate.bind(devisController));
 

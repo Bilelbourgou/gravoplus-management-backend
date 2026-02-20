@@ -586,6 +586,147 @@ export class DevisService {
             data: { notes },
         });
     }
+    /**
+     * Generate PDF for a devis
+     */
+    async generateDevisPDF(devisId: string): Promise<Buffer> {
+        const PDFDocument = (await import('pdfkit')).default;
+
+        const devis = await prisma.devis.findUnique({
+            where: { id: devisId },
+            include: {
+                client: true,
+                createdBy: {
+                    select: { firstName: true, lastName: true },
+                },
+                lines: {
+                    include: { material: true },
+                    orderBy: { createdAt: 'asc' },
+                },
+                services: {
+                    include: { service: true },
+                },
+            },
+        });
+
+        if (!devis) {
+            throw new ApiError(404, 'Devis not found');
+        }
+
+        const { client } = devis;
+
+        return new Promise((resolve, reject) => {
+            const doc = new PDFDocument({ margin: 50 });
+            const chunks: Buffer[] = [];
+
+            doc.on('data', (chunk) => chunks.push(chunk));
+            doc.on('end', () => resolve(Buffer.concat(chunks)));
+            doc.on('error', reject);
+
+            // Header
+            doc.fontSize(24).font('Helvetica-Bold').text('DEVIS', { align: 'center' });
+            doc.moveDown();
+
+            // Devis info
+            doc.fontSize(12).font('Helvetica');
+            doc.text(`N° Devis: ${devis.reference}`);
+            doc.text(`Date: ${devis.createdAt.toLocaleDateString('fr-FR')}`);
+            doc.text(`Statut: ${devis.status}`);
+            if (devis.createdBy) {
+                doc.text(`Créé par: ${devis.createdBy.firstName} ${devis.createdBy.lastName}`);
+            }
+            doc.moveDown();
+
+            // Client info
+            doc.font('Helvetica-Bold').text('Client:');
+            doc.font('Helvetica');
+            doc.text(client.name);
+            if (client.phone) doc.text(`Tél: ${client.phone}`);
+            if (client.email) doc.text(`Email: ${client.email}`);
+            if (client.address) doc.text(`Adresse: ${client.address}`);
+            doc.moveDown();
+
+            // Line items
+            doc.font('Helvetica-Bold').text('Détails:');
+            doc.moveDown(0.5);
+
+            // Table header
+            const tableTop = doc.y;
+            doc.font('Helvetica-Bold').fontSize(10);
+            doc.text('Description', 50, tableTop);
+            doc.text('Quantité', 300, tableTop);
+            doc.text('Prix Unit.', 380, tableTop);
+            doc.text('Total', 460, tableTop);
+
+            doc.moveTo(50, tableTop + 15).lineTo(550, tableTop + 15).stroke();
+
+            let y = tableTop + 25;
+            doc.font('Helvetica').fontSize(10);
+
+            // Lines
+            for (const line of devis.lines) {
+                const desc = `${line.machineType}${line.description ? ` - ${line.description}` : ''}`;
+                const qty = line.minutes ? `${line.minutes} min` :
+                    line.meters ? `${line.meters} m` :
+                        `${line.quantity || 1}`;
+
+                doc.text(desc, 50, y, { width: 240 });
+                doc.text(qty, 300, y);
+                doc.text(`${Number(line.unitPrice).toFixed(2)} TND`, 380, y);
+                doc.text(`${Number(line.lineTotal).toFixed(2)} TND`, 460, y);
+
+                y += 20;
+
+                // Page break if needed
+                if (y > doc.page.height - 120) {
+                    doc.addPage();
+                    y = 50;
+                }
+            }
+
+            // Services
+            for (const ds of devis.services) {
+                doc.text(ds.service.name, 50, y);
+                doc.text('1', 300, y);
+                doc.text(`${Number(ds.price).toFixed(2)} TND`, 380, y);
+                doc.text(`${Number(ds.price).toFixed(2)} TND`, 460, y);
+
+                y += 20;
+
+                if (y > doc.page.height - 120) {
+                    doc.addPage();
+                    y = 50;
+                }
+            }
+
+            // Total
+            doc.moveTo(50, y).lineTo(550, y).stroke();
+            y += 10;
+
+            doc.font('Helvetica-Bold').fontSize(14);
+            doc.text('TOTAL:', 380, y);
+            doc.text(`${Number(devis.totalAmount).toFixed(2)} TND`, 460, y);
+
+            // Notes
+            if (devis.notes) {
+                y += 30;
+                doc.font('Helvetica-Bold').fontSize(10).text('Notes:', 50, y);
+                y += 15;
+                doc.font('Helvetica').fontSize(10).text(devis.notes, 50, y, { width: 500 });
+            }
+
+            // Footer
+            doc.fontSize(10).font('Helvetica');
+            doc.text(
+                'Merci pour votre confiance!',
+                50,
+                doc.page.height - 100,
+                { align: 'center', width: 500 }
+            );
+
+            doc.end();
+        });
+    }
 }
 
 export const devisService = new DevisService();
