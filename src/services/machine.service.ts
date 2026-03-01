@@ -175,3 +175,57 @@ export class MaterialService {
 }
 
 export const materialService = new MaterialService();
+
+// Maintenance Materials
+export class MaintenanceMaterialService {
+    async getAll() {
+        return prisma.maintenanceMaterial.findMany({
+            where: { isActive: true },
+            orderBy: { name: 'asc' },
+        });
+    }
+
+    async create(name: string, pricePerUnit: number, unit: string, description?: string) {
+        return prisma.maintenanceMaterial.create({
+            data: {
+                name,
+                pricePerUnit,
+                unit,
+                description,
+            },
+        });
+    }
+
+    async update(id: string, data: { name?: string; pricePerUnit?: number; unit?: string; description?: string }) {
+        const material = await prisma.maintenanceMaterial.findUnique({ where: { id } });
+
+        if (!material) {
+            throw new ApiError(404, 'Maintenance material not found');
+        }
+
+        return prisma.maintenanceMaterial.update({
+            where: { id },
+            data: {
+                ...(data.name && { name: data.name }),
+                ...(data.pricePerUnit !== undefined && { pricePerUnit: data.pricePerUnit }),
+                ...(data.unit && { unit: data.unit }),
+                ...(data.description !== undefined && { description: data.description }),
+            },
+        });
+    }
+
+    async deactivate(id: string) {
+        const material = await prisma.maintenanceMaterial.findUnique({ where: { id } });
+
+        if (!material) {
+            throw new ApiError(404, 'Maintenance material not found');
+        }
+
+        return prisma.maintenanceMaterial.update({
+            where: { id },
+            data: { isActive: false },
+        });
+    }
+}
+
+export const maintenanceMaterialService = new MaintenanceMaterialService();

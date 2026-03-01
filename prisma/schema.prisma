@@ -90,6 +90,22 @@ model Material {
   @@map("materials")
 }
 
+model MaintenanceMaterial {
+  id          String    @id @default(uuid())
+  name        String
+  pricePerUnit Decimal
+  unit        String    // "m²", "pièce", "m", "kg"
+  description String?
+  isActive    Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  
+  // Relations
+  devisLines  DevisLine[]
+  
+  @@map("maintenance_materials")
+}
+
 model FixedService {
   id          String    @id @default(uuid())
   name        String    // "Design", "Finishing", "Delivery"
@@ -158,6 +174,9 @@ model DevisLine {
   
   materialId    String?
   material      Material? @relation(fields: [materialId], references: [id])
+  
+  maintenanceMaterialId String?
+  maintenanceMaterial   MaintenanceMaterial? @relation(fields: [maintenanceMaterialId], references: [id])
   
   @@map("devis_lines")
 }

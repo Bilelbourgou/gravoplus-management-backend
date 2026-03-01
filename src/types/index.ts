@@ -70,6 +70,8 @@ export interface AddDevisLineDto {
     meters?: number;
     quantity?: number;
     materialId?: string;
+    maintenanceMaterialId?: string;
+    serviceId?: string;
     unitPrice?: number;
     width?: number;
     height?: number;
@@ -86,6 +88,7 @@ export interface CalculationInput {
     meters?: number;
     quantity?: number;
     materialId?: string;
+    maintenanceMaterialId?: string;
     serviceId?: string;
     unitPrice?: number;
     width?: number;

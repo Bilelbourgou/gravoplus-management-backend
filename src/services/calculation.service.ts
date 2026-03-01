@@ -118,16 +118,16 @@ export class CalculationService {
                 break;
 
             case MachineType.SERVICE_MAINTENANCE:
-                // Service Maintenance: can use material, fixed service, or manual price
+                // Service Maintenance: can use maintenance material, fixed service, or manual price
                 const maintenanceQty = input.quantity && input.quantity > 0 ? input.quantity : 1;
 
-                if (input.materialId) {
-                    // Using material - calculate based on material price × quantity
-                    const maintenanceMaterial = await prisma.material.findUnique({
-                        where: { id: input.materialId },
+                if (input.maintenanceMaterialId) {
+                    // Using maintenance material - calculate based on maintenance material price × quantity
+                    const maintenanceMaterial = await prisma.maintenanceMaterial.findUnique({
+                        where: { id: input.maintenanceMaterialId },
                     });
                     if (!maintenanceMaterial) {
-                        throw new ApiError(404, 'Material not found');
+                        throw new ApiError(404, 'Maintenance material not found');
                     }
                     const materialPrice = Number(maintenanceMaterial.pricePerUnit);
                     lineTotal = maintenanceQty * materialPrice;

@@ -299,6 +299,8 @@ export class DevisService {
             meters: data.meters,
             quantity: data.quantity,
             materialId: data.materialId,
+            maintenanceMaterialId: data.maintenanceMaterialId,
+            serviceId: data.serviceId,
             unitPrice: data.unitPrice,
             width: data.width,
             height: data.height,
@@ -317,12 +319,14 @@ export class DevisService {
                 materialCost: calculation.materialCost,
                 lineTotal: calculation.lineTotal,
                 materialId: data.materialId,
+                maintenanceMaterialId: data.maintenanceMaterialId,
                 width: data.width ?? null,
                 height: data.height ?? null,
                 dimensionUnit: data.dimensionUnit ?? 'm',
             },
             include: {
                 material: true,
+                maintenanceMaterial: true,
             },
         });
 
