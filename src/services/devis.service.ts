@@ -1,4 +1,5 @@
 
+import path from 'path';
 import prisma from '../config/database';
 import { CreateDevisDto, AddDevisLineDto, AddDevisServiceDto, DevisStatus, UserRole, CreateCustomDevisDto, MachineType } from '../types';
 import { ApiError } from '../middleware';
@@ -600,133 +601,237 @@ export class DevisService {
             where: { id: devisId },
             include: {
                 client: true,
-                createdBy: {
-                    select: { firstName: true, lastName: true },
-                },
+                createdBy: { select: { firstName: true, lastName: true } },
                 lines: {
-                    include: { material: true },
+                    include: { material: true, maintenanceMaterial: true },
                     orderBy: { createdAt: 'asc' },
                 },
-                services: {
-                    include: { service: true },
-                },
+                services: { include: { service: true } },
             },
         });
 
-        if (!devis) {
-            throw new ApiError(404, 'Devis not found');
-        }
+        if (!devis) throw new ApiError(404, 'Devis not found');
 
         const { client } = devis;
 
         return new Promise((resolve, reject) => {
-            const doc = new PDFDocument({ margin: 50 });
+            const doc = new PDFDocument({ margin: 0, size: 'A4' });
             const chunks: Buffer[] = [];
 
-            doc.on('data', (chunk) => chunks.push(chunk));
+            doc.on('data', (chunk: Buffer) => chunks.push(chunk));
             doc.on('end', () => resolve(Buffer.concat(chunks)));
             doc.on('error', reject);
 
-            // Header
-            doc.fontSize(24).font('Helvetica-Bold').text('DEVIS', { align: 'center' });
-            doc.moveDown();
+            const PW = doc.page.width;   // 595.28
+            const PH = doc.page.height;  // 841.89
+            const M  = 40;
+            const CW = PW - M * 2;       // 515.28
 
-            // Devis info
-            doc.fontSize(12).font('Helvetica');
-            doc.text(`N° Devis: ${devis.reference}`);
-            doc.text(`Date: ${devis.createdAt.toLocaleDateString('fr-FR')}`);
-            doc.text(`Statut: ${devis.status}`);
-            if (devis.createdBy) {
-                doc.text(`Créé par: ${devis.createdBy.firstName} ${devis.createdBy.lastName}`);
-            }
-            doc.moveDown();
+            // ── Helpers ──────────────────────────────────────────────────────
+            const hline = (x1: number, ly: number, x2: number) =>
+                doc.moveTo(x1, ly).lineTo(x2, ly).stroke('#000');
 
-            // Client info
-            doc.font('Helvetica-Bold').text('Client:');
-            doc.font('Helvetica');
-            doc.text(client.name);
-            if (client.phone) doc.text(`Tél: ${client.phone}`);
-            if (client.email) doc.text(`Email: ${client.email}`);
-            if (client.address) doc.text(`Adresse: ${client.address}`);
-            doc.moveDown();
+            const vline = (lx: number, y1: number, y2: number) =>
+                doc.moveTo(lx, y1).lineTo(lx, y2).stroke('#000');
 
-            // Line items
-            doc.font('Helvetica-Bold').text('Détails:');
-            doc.moveDown(0.5);
+            const fillRect = (x: number, fy: number, w: number, h: number, fill: string) => {
+                doc.rect(x, fy, w, h).fillAndStroke(fill, '#000');
+                doc.fillColor('#000');
+            };
 
-            // Table header
-            const tableTop = doc.y;
-            doc.font('Helvetica-Bold').fontSize(10);
-            doc.text('Description', 50, tableTop);
-            doc.text('Quantité', 300, tableTop);
-            doc.text('Prix Unit.', 380, tableTop);
-            doc.text('Total', 460, tableTop);
+            const strokeRect = (x: number, sy: number, w: number, h: number) =>
+                doc.rect(x, sy, w, h).stroke('#000');
 
-            doc.moveTo(50, tableTop + 15).lineTo(550, tableTop + 15).stroke();
+            const txt = (
+                text: string, x: number, ty: number, w: number,
+                opts?: { bold?: boolean; size?: number; align?: 'left' | 'right' | 'center'; color?: string }
+            ) => {
+                doc.font(opts?.bold ? 'Helvetica-Bold' : 'Helvetica')
+                   .fontSize(opts?.size ?? 8)
+                   .fillColor(opts?.color ?? '#000')
+                   .text(text, x, ty, { width: w, lineBreak: false });
+            };
 
-            let y = tableTop + 25;
-            doc.font('Helvetica').fontSize(10);
+            // ── Logo ─────────────────────────────────────────────────────────
+            const logoPath = path.join(process.cwd(), 'assets', 'logo.png');
+            try {
+                doc.image(logoPath, M, M, { fit: [130, 55] });
+            } catch (_) { /* logo file not found, skip */ }
 
-            // Lines
+            // ── Section 1: Company box (left) + Client box (right) ────────────
+            let y = M + 65;
+
+            // Company info box
+            strokeRect(M, y, 245, 128);
+            txt('M. - CHERIF LASSAD - GRAVOPLUS', M + 5, y + 8,  235, { bold: true, size: 9 });
+            txt('Avenue Habib Bourguiba Djerba',  M + 5, y + 22, 235, { size: 8 });
+            txt('4180 Houmet Souk',               M + 5, y + 33, 235, { size: 8 });
+            txt('Tél: 0021675622335',             M + 5, y + 44, 235, { size: 8 });
+            txt('Mobile: 0021650868976',          M + 5, y + 55, 235, { size: 8 });
+            txt('Email: gravoplus@gmail.com',     M + 5, y + 66, 235, { size: 8 });
+            txt('TVA Intra: 000CN840811/D',       M + 5, y + 77, 235, { size: 8 });
+            txt('BANQUE ZITOUNA',                 M + 5, y + 88, 235, { size: 8 });
+            txt('RIB: 2503400000032226629',       M + 5, y + 99, 235, { size: 8 });
+
+            // Client info box
+            const cbX = PW - M - 200;
+            strokeRect(cbX, y, 200, 80);
+            txt(client.name,          cbX + 5, y + 14, 190, { bold: true, size: 10 });
+            if (client.address) txt(client.address,  cbX + 5, y + 30, 190, { size: 8 });
+            if (client.phone)   txt(`Tél: ${client.phone}`, cbX + 5, y + 42, 190, { size: 8 });
+            if (client.email)   txt(client.email,    cbX + 5, y + 54, 190, { size: 8 });
+
+            // ── Section 2: Devis reference table ─────────────────────────────
+            y = M + 208;
+            const rh   = 18;
+            const cw4  = CW / 4;
+
+            const validityDate = new Date(devis.createdAt);
+            validityDate.setDate(validityDate.getDate() + 30);
+
+            // Header row (blue-grey fill)
+            fillRect(M, y, CW, rh, '#c8d4e8');
+            txt('Devis',         M + cw4 * 0 + 5, y + 5, cw4 - 10, { bold: true, size: 9 });
+            txt('Date',          M + cw4 * 1 + 5, y + 5, cw4 - 10, { bold: true, size: 9 });
+            txt('Date validité', M + cw4 * 2 + 5, y + 5, cw4 - 10, { bold: true, size: 9 });
+            txt('Code Client',   M + cw4 * 3 + 5, y + 5, cw4 - 10, { bold: true, size: 9 });
+            [1, 2, 3].forEach(i => vline(M + cw4 * i, y, y + rh));
+
+            y += rh;
+
+            // Data row
+            strokeRect(M, y, CW, rh);
+            txt(devis.reference,                             M + cw4 * 0 + 5, y + 5, cw4 - 10, { size: 9 });
+            txt(devis.createdAt.toLocaleDateString('fr-FR'), M + cw4 * 1 + 5, y + 5, cw4 - 10, { size: 9 });
+            txt(validityDate.toLocaleDateString('fr-FR'),    M + cw4 * 2 + 5, y + 5, cw4 - 10, { size: 9 });
+            txt(client.id.slice(-7).toUpperCase(),           M + cw4 * 3 + 5, y + 5, cw4 - 10, { size: 9 });
+            [1, 2, 3].forEach(i => vline(M + cw4 * i, y, y + rh));
+
+            // ── Section 3: Items table ────────────────────────────────────────
+            y += rh + 8;
+
+            // Columns: x position + width  (total = 515)
+            const C = [
+                { x: M,       w: 25  }, // Réf
+                { x: M + 25,  w: 195 }, // Désignation
+                { x: M + 220, w: 40  }, // Unité
+                { x: M + 260, w: 55  }, // Quantité
+                { x: M + 315, w: 70  }, // PU HT
+                { x: M + 385, w: 55  }, // Remise
+                { x: M + 440, w: 75  }, // Total HT
+            ];
+            const HEADERS = ['Réf', 'Désignation', 'Unité', 'Quantité', 'PU HT', 'Remise', 'Total HT'];
+            const HALIGN: Array<'left' | 'right' | 'center'> = ['center', 'left', 'center', 'right', 'right', 'center', 'right'];
+            const rowH = 18;
+
+            // Table header row
+            fillRect(M, y, CW, rowH, '#e0e0e0');
+            C.forEach((c, i) => txt(HEADERS[i], c.x + 2, y + 5, c.w - 4, { bold: true, align: HALIGN[i] }));
+            C.slice(1).forEach(c => vline(c.x, y, y + rowH));
+            y += rowH;
+
+            // Helper: draw one data row
+            const drawRow = (cols: string[]) => {
+                if (y + rowH > PH - 190) { doc.addPage(); y = M; }
+                hline(M, y + rowH, M + CW);
+                vline(M, y, y + rowH);
+                vline(M + CW, y, y + rowH);
+                C.slice(1).forEach(c => vline(c.x, y, y + rowH));
+                C.forEach((c, i) => txt(cols[i] ?? '', c.x + 2, y + 5, c.w - 4, { align: HALIGN[i] }));
+                y += rowH;
+            };
+
+            let lineNum = 1;
             for (const line of devis.lines) {
-                const desc = `${line.machineType}${line.description ? ` - ${line.description}` : ''}`;
-                const qty = line.minutes ? `${line.minutes} min` :
-                    line.meters ? `${line.meters} m` :
-                        `${line.quantity || 1}`;
-
-                doc.text(desc, 50, y, { width: 240 });
-                doc.text(qty, 300, y);
-                doc.text(`${Number(line.unitPrice).toFixed(2)} TND`, 380, y);
-                doc.text(`${Number(line.lineTotal).toFixed(2)} TND`, 460, y);
-
-                y += 20;
-
-                // Page break if needed
-                if (y > doc.page.height - 120) {
-                    doc.addPage();
-                    y = 50;
-                }
+                const unit = line.minutes ? 'min'
+                    : line.meters ? 'm'
+                    : (line.material?.unit ?? (line as any).maintenanceMaterial?.unit ?? 'p');
+                const qty  = line.minutes ?? line.meters ?? Number(line.quantity ?? 1);
+                drawRow([
+                    String(lineNum++),
+                    line.description ?? line.machineType,
+                    unit,
+                    Number(qty).toFixed(2),
+                    Number(line.unitPrice).toFixed(3),
+                    '-',
+                    Number(line.lineTotal).toFixed(3),
+                ]);
             }
 
-            // Services
             for (const ds of devis.services) {
-                doc.text(ds.service.name, 50, y);
-                doc.text('1', 300, y);
-                doc.text(`${Number(ds.price).toFixed(2)} TND`, 380, y);
-                doc.text(`${Number(ds.price).toFixed(2)} TND`, 460, y);
-
-                y += 20;
-
-                if (y > doc.page.height - 120) {
-                    doc.addPage();
-                    y = 50;
-                }
+                drawRow([
+                    String(lineNum++),
+                    ds.service.name,
+                    'p',
+                    '1,00',
+                    Number(ds.price).toFixed(3),
+                    '-',
+                    Number(ds.price).toFixed(3),
+                ]);
             }
 
-            // Total
-            doc.moveTo(50, y).lineTo(550, y).stroke();
-            y += 10;
+            // ── Section 4: Totals summary box (right) ────────────────────────
+            const totalHT      = Number(devis.totalAmount);
+            const timbreFiscal = Math.round(totalHT * 0.01 * 1000) / 1000;
+            const totalTTC     = Math.round((totalHT + timbreFiscal) * 1000) / 1000;
 
-            doc.font('Helvetica-Bold').fontSize(14);
-            doc.text('TOTAL:', 380, y);
-            doc.text(`${Number(devis.totalAmount).toFixed(2)} TND`, 460, y);
+            const sbW  = 215;
+            const sbX  = PW - M - sbW;
+            const srh  = 16;
+            let   sy   = y + 12;
 
-            // Notes
+            if (sy + srh * 5 + 10 > PH - 80) { doc.addPage(); sy = M; }
+
+            strokeRect(sbX, sy, sbW, srh * 5);
+            [1, 2, 3, 4].forEach(i => hline(sbX, sy + srh * i, sbX + sbW));
+
+            const sumRow = (label: string, value: string, i: number, bold?: boolean) => {
+                const ry = sy + srh * i;
+                txt(label, sbX + 4,   ry + 4, 110,         { bold, size: 8 });
+                txt(value, sbX + 118, ry + 4, sbW - 122,   { bold, size: 8, align: 'right' });
+            };
+
+            sumRow('Total HT :',    `${totalHT.toFixed(3)} Dt`,      0);
+            sumRow('Exo.',          `${totalHT.toFixed(3)} D`,        1);
+            sumRow('Timbre Fiscal', `${timbreFiscal.toFixed(3)} Dt`,  2);
+            sumRow('Total TTC:',    `${totalTTC.toFixed(3)} Dt`,      3, true);
+            sumRow('Acomptes:',     '0,000 Dt',                       4);
+
+            // ── Section 5: Payment conditions (left) ─────────────────────────
+            const nw = sbX - M - 12;
+            let   ny = y + 12;
+
+            doc.font('Helvetica').fontSize(7.5).fillColor('#000');
+
             if (devis.notes) {
-                y += 30;
-                doc.font('Helvetica-Bold').fontSize(10).text('Notes:', 50, y);
-                y += 15;
-                doc.font('Helvetica').fontSize(10).text(devis.notes, 50, y, { width: 500 });
+                doc.text(devis.notes, M, ny, { width: nw });
+                ny = doc.y + 5;
             }
 
-            // Footer
-            doc.fontSize(10).font('Helvetica');
-            doc.text(
-                'Merci pour votre confiance!',
-                50,
-                doc.page.height - 100,
-                { align: 'center', width: 500 }
-            );
+            doc.font('Helvetica-Bold').fontSize(7.5)
+               .text('Règlement(s)/Acompte(s) :', M, ny, { width: nw });
+            ny = doc.y + 2;
+            doc.font('Helvetica').fontSize(7.5)
+               .text('Avance sur devis 50%/2eme avance 30% a livraison/20% a la reception', M, ny, { width: nw });
+            ny = doc.y + 5;
+
+            doc.font('Helvetica-Bold').fontSize(7.5)
+               .text('Mode de règlement: ', M, ny, { continued: true });
+            doc.font('Helvetica').text('Espèce');
+            ny = doc.y + 5;
+
+            doc.font('Helvetica').fontSize(7.5).fillColor('red')
+               .text(`Devis valable jusqu'au: ${validityDate.toLocaleDateString('fr-FR')}`, M, ny, { width: nw });
+            doc.fillColor('#000');
+
+            // ── Footer ────────────────────────────────────────────────────────
+            const fy = PH - 40;
+            doc.font('Helvetica-Bold').fontSize(9).fillColor('#000')
+               .text('GRAVOPLUS', M, fy, { width: CW, align: 'center' });
+            doc.font('Helvetica').fontSize(7)
+               .text('Avenue Habib Bourguiba Djerba - 4180 Houmet Souk | gravoplus@gmail.com', M, fy + 13, { width: CW, align: 'center' });
+            doc.fontSize(7)
+               .text('1/1', M, fy + 24, { width: CW, align: 'right' });
 
             doc.end();
         });
