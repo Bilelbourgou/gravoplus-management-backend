@@ -16,6 +16,21 @@ export class PaymentController {
         }
     }
 
+    async createClientPayment(req: Request, res: Response, next: NextFunction) {
+        try {
+            const { clientId } = req.params;
+            const userId = req.user?.id;
+            const payments = await paymentService.createClientPayment(clientId as string, req.body, userId);
+
+            res.status(201).json({
+                success: true,
+                data: payments,
+            });
+        } catch (error) {
+            next(error);
+        }
+    }
+
     async getPaymentsByDevis(req: Request, res: Response, next: NextFunction) {
         try {
             const { devisId } = req.params;

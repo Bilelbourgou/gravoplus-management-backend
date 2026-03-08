@@ -65,6 +65,18 @@ export class ExpenseService {
         // Exclude expenses created by superadmin (for admin users)
         if (filters?.excludeSuperadmin) {
             where.createdBy = { role: { not: UserRole.SUPERADMIN } };
+
+            // Hide expenses from closed periods for admin users
+            const lastClosure = await prisma.financialClosure.findFirst({
+                where: { scope: 'ADMIN_LEVEL' },
+                orderBy: { closureDate: 'desc' },
+            });
+            if (lastClosure) {
+                where.date = {
+                    ...where.date,
+                    gt: lastClosure.periodEnd,
+                };
+            }
         }
 
         return prisma.expense.findMany({
@@ -112,6 +124,14 @@ export class ExpenseService {
      * Create new expense
      */
     async createExpense(data: CreateExpenseDto, userId: string) {
+        // Verify the category exists before creating
+        const categoryExists = await prisma.expenseCategory.findUnique({
+            where: { name: data.category },
+        });
+        if (!categoryExists) {
+            throw new ApiError(400, `Catégorie "${data.category}" introuvable. Veuillez créer la catégorie d'abord.`);
+        }
+
         const expense = await prisma.expense.create({
             data: {
                 description: data.description,
@@ -220,6 +240,18 @@ export class ExpenseService {
         // Exclude expenses created by superadmin (for admin users)
         if (excludeSuperadmin) {
             where.createdBy = { role: { not: UserRole.SUPERADMIN } };
+
+            // Hide expenses from closed periods for admin users
+            const lastClosure = await prisma.financialClosure.findFirst({
+                where: { scope: 'ADMIN_LEVEL' },
+                orderBy: { closureDate: 'desc' },
+            });
+            if (lastClosure) {
+                where.date = {
+                    ...where.date,
+                    gt: lastClosure.periodEnd,
+                };
+            }
         }
 
         const expenses = await prisma.expense.findMany({

@@ -15,6 +15,11 @@ export enum MachineType {
     CUSTOM = 'CUSTOM',
 }
 
+export enum DevisType {
+    DEVIS = 'DEVIS',
+    ENCAISSEMENT = 'ENCAISSEMENT',
+}
+
 export enum DevisStatus {
     DRAFT = 'DRAFT',
     VALIDATED = 'VALIDATED',

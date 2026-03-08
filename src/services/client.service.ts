@@ -174,6 +174,8 @@ export class ClientService {
 
         let totalDevisAmount = 0;
         let totalPaid = 0;
+        let payableDevisAmount = 0;
+        let payablePaid = 0;
 
         const devisWithBalance = client.devis.map((devis) => {
             const devisTotal = Number(devis.totalAmount);
@@ -184,6 +186,12 @@ export class ClientService {
 
             totalDevisAmount += devisTotal;
             totalPaid += paidAmount;
+
+            // Only VALIDATED and INVOICED devis count toward payable outstanding
+            if (devis.status === 'VALIDATED' || devis.status === 'INVOICED') {
+                payableDevisAmount += devisTotal;
+                payablePaid += paidAmount;
+            }
 
             return {
                 id: devis.id,
@@ -224,7 +232,7 @@ export class ClientService {
             summary: {
                 totalDevisAmount,
                 totalPaid,
-                outstandingBalance: totalDevisAmount - totalPaid,
+                outstandingBalance: payableDevisAmount - payablePaid,
                 devisCount: devisWithBalance.length,
                 fullyPaidCount: devisWithBalance.filter(d => d.isFullyPaid).length,
                 pendingPaymentCount: devisWithBalance.filter(d => !d.isFullyPaid && d.status === 'VALIDATED').length,

@@ -123,9 +123,11 @@ model FixedService {
 
 model Devis {
   id            String    @id @default(uuid())
-  reference     String    @unique  // DEV-2024-0001
+  reference     String    @unique  // DEV-2024-0001 or ENC-2024-0001
+  type          String    @default("DEVIS") // DEVIS | ENCAISSEMENT
   status        String    @default("DRAFT") // DRAFT | VALIDATED | INVOICED | CANCELLED
   totalAmount   Decimal   @default(0)
+  acompte       Decimal   @default(0)
   notes         String?
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt

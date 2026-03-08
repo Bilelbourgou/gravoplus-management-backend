@@ -1,11 +1,11 @@
 import { Request, Response, NextFunction } from 'express';
 import { devisService, calculationService } from '../services';
-import { DevisStatus, UserRole } from '../types';
+import { DevisStatus, DevisType, UserRole } from '../types';
 
 export class DevisController {
     async getAll(req: Request, res: Response, next: NextFunction) {
         try {
-            const { clientId, status, dateFrom, dateTo } = req.query;
+            const { clientId, status, type, dateFrom, dateTo } = req.query;
 
             const devisList = await devisService.getAllDevis(
                 req.user!.id,
@@ -13,6 +13,7 @@ export class DevisController {
                 {
                     clientId: clientId as string,
                     status: status as DevisStatus,
+                    type: type as DevisType,
                     dateFrom: dateFrom ? new Date(dateFrom as string) : undefined,
                     dateTo: dateTo ? new Date(dateTo as string) : undefined,
                 }
@@ -193,11 +194,29 @@ export class DevisController {
         }
     }
 
+    async updateAcompte(req: Request, res: Response, next: NextFunction) {
+        try {
+            const { id } = req.params;
+            const { acompte } = req.body;
+
+            if (acompte === undefined || acompte === null) {
+                res.status(400).json({ success: false, error: 'Acompte amount is required' });
+                return;
+            }
+
+            const devis = await devisService.updateAcompte(id as string, Number(acompte));
+
+            res.json({ success: true, data: devis });
+        } catch (error) {
+            next(error);
+        }
+    }
+
     async validate(req: Request, res: Response, next: NextFunction) {
         try {
             const { id } = req.params;
 
-            const devis = await devisService.validateDevis(id as string);
+            const devis = await devisService.validateDevis(id as string, req.user?.id);
 
             res.json({
                 success: true,
@@ -304,6 +323,52 @@ export class DevisController {
             next(error);
         }
     }
+    async createEncaissement(req: Request, res: Response, next: NextFunction) {
+        try {
+            const { clientId, notes } = req.body;
+
+            if (!clientId) {
+                res.status(400).json({
+                    success: false,
+                    error: 'Client ID is required',
+                });
+                return;
+            }
+
+            const encaissement = await devisService.createEncaissement(req.user!.id, {
+                clientId,
+                notes,
+            });
+
+            res.status(201).json({
+                success: true,
+                data: encaissement,
+            });
+        } catch (error) {
+            next(error);
+        }
+    }
+
+    async finalizeEncaissement(req: Request, res: Response, next: NextFunction) {
+        try {
+            const { id } = req.params;
+            const { paymentMethod } = req.body;
+
+            const result = await devisService.finalizeEncaissement(
+                id as string,
+                req.user!.id,
+                paymentMethod
+            );
+
+            res.json({
+                success: true,
+                data: result,
+            });
+        } catch (error) {
+            next(error);
+        }
+    }
+
     async downloadPDF(req: Request, res: Response, next: NextFunction) {
         try {
             const { id } = req.params;

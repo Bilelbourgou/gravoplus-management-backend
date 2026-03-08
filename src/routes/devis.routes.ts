@@ -11,8 +11,15 @@ router.use(authenticate);
 router.get('/', isEmployeeOrAdmin, devisController.getAll.bind(devisController));
 router.get('/:id', isEmployeeOrAdmin, devisController.getById.bind(devisController));
 router.get('/:id/pdf', isEmployeeOrAdmin, devisController.downloadPDF.bind(devisController));
-router.post('/', isEmployeeOrAdmin, devisController.create.bind(devisController));
 router.post('/calculate', isEmployeeOrAdmin, devisController.calculate.bind(devisController));
+
+// Devis creation - SuperAdmin only
+router.post('/', isSuperAdmin, devisController.create.bind(devisController));
+router.post('/custom', isSuperAdmin, devisController.createCustomDevis.bind(devisController));
+
+// Encaissement - Admin & Employee
+router.post('/encaissement', isEmployeeOrAdmin, devisController.createEncaissement.bind(devisController));
+router.post('/:id/finalize', isEmployeeOrAdmin, devisController.finalizeEncaissement.bind(devisController));
 
 // Line management
 router.post('/:id/lines', isEmployeeOrAdmin, devisController.addLine.bind(devisController));
@@ -25,8 +32,10 @@ router.delete('/:id/services/:serviceId', isEmployeeOrAdmin, devisController.rem
 // Notes
 router.patch('/:id/notes', isEmployeeOrAdmin, devisController.updateNotes.bind(devisController));
 
+// Acompte (SuperAdmin only)
+router.patch('/:id/acompte', isSuperAdmin, devisController.updateAcompte.bind(devisController));
+
 // Admin only routes
-router.post('/custom', isAdmin, devisController.createCustomDevis.bind(devisController));
 router.post('/:id/validate', isEmployeeOrAdmin, devisController.validate.bind(devisController));
 router.post('/:id/cancel', isAdmin, devisController.cancel.bind(devisController));
 router.patch('/:id/status', isSuperAdmin, devisController.updateStatus.bind(devisController));

@@ -8,6 +8,7 @@ router.use(authenticate);
 
 // Caisse payment routes
 router.post('/caisse', isEmployeeOrAdmin, paymentController.createCaissePayment.bind(paymentController));
+router.post('/client/:clientId', isEmployeeOrAdmin, paymentController.createClientPayment.bind(paymentController));
 router.get('/devis/:devisId', isEmployeeOrAdmin, paymentController.getPaymentsByDevis.bind(paymentController));
 
 // Legacy invoice-based routes (kept for backward compat)

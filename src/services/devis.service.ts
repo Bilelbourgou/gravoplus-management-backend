@@ -1,21 +1,22 @@
 
 import path from 'path';
 import prisma from '../config/database';
-import { CreateDevisDto, AddDevisLineDto, AddDevisServiceDto, DevisStatus, UserRole, CreateCustomDevisDto, MachineType } from '../types';
+import { CreateDevisDto, AddDevisLineDto, AddDevisServiceDto, DevisStatus, DevisType, UserRole, CreateCustomDevisDto, MachineType } from '../types';
 import { ApiError } from '../middleware';
 import { calculationService } from './calculation.service';
 import { notificationService } from './notification.service';
+import { paymentService } from './payment.service';
 
 export class DevisService {
     /**
      * Generate unique devis reference
      */
-    private async generateReference(): Promise<string> {
+    private async generateReference(prefix: string = 'DEV'): Promise<string> {
         const year = new Date().getFullYear();
         const lastDevis = await prisma.devis.findFirst({
             where: {
                 reference: {
-                    startsWith: `DEV-${year}`,
+                    startsWith: `${prefix}-${year}`,
                 },
             },
             orderBy: {
@@ -34,7 +35,7 @@ export class DevisService {
             }
         }
 
-        return `DEV-${year}-${number.toString().padStart(4, '0')}`;
+        return `${prefix}-${year}-${number.toString().padStart(4, '0')}`;
     }
 
     /**
@@ -43,6 +44,7 @@ export class DevisService {
     async getAllDevis(userId: string, role: UserRole, filters?: {
         clientId?: string;
         status?: DevisStatus;
+        type?: DevisType;
         dateFrom?: Date;
         dateTo?: Date;
     }) {
@@ -62,6 +64,10 @@ export class DevisService {
 
         if (filters?.status) {
             where.status = filters.status;
+        }
+
+        if (filters?.type) {
+            where.type = filters.type;
         }
 
         if (filters?.dateFrom || filters?.dateTo) {
@@ -145,11 +151,12 @@ export class DevisService {
             throw new ApiError(401, 'User session expired. Please log in again.');
         }
 
-        const reference = await this.generateReference();
+        const reference = await this.generateReference('DEV');
 
         const devis = await prisma.devis.create({
             data: {
                 reference,
+                type: DevisType.DEVIS,
                 clientId: data.clientId,
                 createdById: userId,
                 notes: data.notes,
@@ -173,6 +180,99 @@ export class DevisService {
         });
 
         return devis;
+    }
+
+    /**
+     * Create new encaissement (Admin/Employee)
+     */
+    async createEncaissement(userId: string, data: CreateDevisDto) {
+        // Verify client exists
+        const client = await prisma.client.findUnique({
+            where: { id: data.clientId },
+        });
+
+        if (!client) {
+            throw new ApiError(404, 'Client not found');
+        }
+
+        // Verify user exists
+        const user = await prisma.user.findUnique({
+            where: { id: userId },
+        });
+
+        if (!user) {
+            throw new ApiError(401, 'User session expired. Please log in again.');
+        }
+
+        const reference = await this.generateReference('ENC');
+
+        const encaissement = await prisma.devis.create({
+            data: {
+                reference,
+                type: DevisType.ENCAISSEMENT,
+                clientId: data.clientId,
+                createdById: userId,
+                notes: data.notes,
+            },
+            include: {
+                client: true,
+                createdBy: {
+                    select: { id: true, firstName: true, lastName: true },
+                },
+            },
+        });
+
+        return encaissement;
+    }
+
+    /**
+     * Finalize encaissement: validate + auto-create full payment
+     */
+    async finalizeEncaissement(encaissementId: string, userId: string, paymentMethod?: string) {
+        const encaissement = await prisma.devis.findUnique({
+            where: { id: encaissementId },
+            include: { lines: true, client: true },
+        });
+
+        if (!encaissement) {
+            throw new ApiError(404, 'Encaissement not found');
+        }
+
+        if (encaissement.type !== DevisType.ENCAISSEMENT) {
+            throw new ApiError(400, 'This is not an encaissement');
+        }
+
+        if (encaissement.status !== DevisStatus.DRAFT) {
+            throw new ApiError(400, 'Encaissement is not in draft status');
+        }
+
+        if (encaissement.lines.length === 0) {
+            throw new ApiError(400, 'Cannot finalize an empty encaissement');
+        }
+
+        const totalAmount = Number(encaissement.totalAmount);
+
+        // Validate the encaissement
+        const updated = await prisma.devis.update({
+            where: { id: encaissementId },
+            data: {
+                status: DevisStatus.VALIDATED,
+                validatedAt: new Date(),
+            },
+            include: { client: true },
+        });
+
+        // Create notification
+        await notificationService.create({
+            type: 'DEVIS_VALIDATED',
+            title: 'Nouvel encaissement',
+            message: `Encaissement ${encaissement.reference} finalisé pour ${encaissement.client.name} - ${totalAmount.toFixed(3)} TND`,
+            entityType: 'devis',
+            entityId: encaissementId,
+            triggeredById: userId,
+        });
+
+        return updated;
     }
 
     /**
@@ -442,12 +542,27 @@ export class DevisService {
     }
 
     /**
+     * Update acompte on a devis (SuperAdmin only, DRAFT only)
+     */
+    async updateAcompte(devisId: string, acompte: number) {
+        const devis = await prisma.devis.findUnique({ where: { id: devisId } });
+        if (!devis) throw new ApiError(404, 'Devis not found');
+        if (devis.status !== DevisStatus.DRAFT) throw new ApiError(400, 'Cannot modify a non-draft devis');
+        if (acompte < 0) throw new ApiError(400, 'L\'acompte ne peut pas être négatif');
+
+        return prisma.devis.update({
+            where: { id: devisId },
+            data: { acompte },
+        });
+    }
+
+    /**
      * Validate devis (Admin only)
      */
-    async validateDevis(devisId: string) {
+    async validateDevis(devisId: string, userId?: string) {
         const devis = await prisma.devis.findUnique({
             where: { id: devisId },
-            include: { lines: true },
+            include: { lines: true, client: true },
         });
 
         if (!devis) {
@@ -470,6 +585,30 @@ export class DevisService {
             },
             include: { client: true },
         });
+
+        // Auto-create payment if acompte > 0
+        const acompteAmount = Number(devis.acompte);
+        if (acompteAmount > 0) {
+            await prisma.payment.create({
+                data: {
+                    amount: acompteAmount,
+                    description: `Acompte - ${devis.reference}`,
+                    devisId: devis.id,
+                    paymentDate: new Date(),
+                    paymentMethod: 'Espèces',
+                    createdById: userId,
+                },
+            });
+
+            await notificationService.create({
+                type: 'PAYMENT_RECEIVED',
+                title: 'Acompte reçu',
+                message: `Acompte de ${acompteAmount.toFixed(3)} TND reçu pour ${devis.client.name} (${devis.reference})`,
+                entityType: 'payment',
+                entityId: devis.id,
+                triggeredById: userId,
+            });
+        }
 
         // Create notification
         await notificationService.create({
@@ -795,7 +934,8 @@ export class DevisService {
             sumRow('Exo.',          `${totalHT.toFixed(3)} D`,        1);
             sumRow('Timbre Fiscal', `${timbreFiscal.toFixed(3)} Dt`,  2);
             sumRow('Total TTC:',    `${totalTTC.toFixed(3)} Dt`,      3, true);
-            sumRow('Acomptes:',     '0,000 Dt',                       4);
+            const acompteVal = Number(devis.acompte);
+            sumRow('Acomptes:',     `${acompteVal.toFixed(3)} Dt`,     4);
 
             // ── Section 5: Payment conditions (left) ─────────────────────────
             const nw = sbX - M - 12;
