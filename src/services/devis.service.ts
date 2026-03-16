@@ -557,6 +557,40 @@ export class DevisService {
     }
 
     /**
+     * Update remise on a devis (SuperAdmin only, DRAFT only)
+     */
+    async updateRemise(devisId: string, remise: number, remiseType: 'FIXED' | 'PERCENTAGE') {
+        const devis = await prisma.devis.findUnique({ where: { id: devisId } });
+        if (!devis) throw new ApiError(404, 'Devis not found');
+        if (devis.status !== DevisStatus.DRAFT) throw new ApiError(400, 'Cannot modify a non-draft devis');
+        if (remise < 0) throw new ApiError(400, 'La remise ne peut pas être négative');
+
+        await prisma.devis.update({
+            where: { id: devisId },
+            data: { remise, remiseType },
+        });
+
+        return calculationService.calculateDevisTotal(devisId);
+    }
+
+    /**
+     * Update timbre fiscal on a devis (SuperAdmin only, DRAFT only)
+     */
+    async updateTimbreFiscal(devisId: string, amount: number) {
+        const devis = await prisma.devis.findUnique({ where: { id: devisId } });
+        if (!devis) throw new ApiError(404, 'Devis not found');
+        if (devis.status !== DevisStatus.DRAFT) throw new ApiError(400, 'Cannot modify a non-draft devis');
+        if (amount < 0) throw new ApiError(400, 'Le timbre fiscal ne peut pas être négatif');
+
+        await prisma.devis.update({
+            where: { id: devisId },
+            data: { timbreFiscal: amount },
+        });
+
+        return calculationService.calculateDevisTotal(devisId);
+    }
+
+    /**
      * Validate devis (Admin only)
      */
     async validateDevis(devisId: string, userId?: string) {
@@ -909,20 +943,32 @@ export class DevisService {
                 ]);
             }
 
-            // ── Section 4: Totals summary box (right) ────────────────────────
-            const totalHT      = Number(devis.totalAmount);
-            const timbreFiscal = Math.round(totalHT * 0.01 * 1000) / 1000;
-            const totalTTC     = Math.round((totalHT + timbreFiscal) * 1000) / 1000;
+            // Sum of lines and services
+            const linesTotal = devis.lines.reduce((sum, line) => sum + Number(line.lineTotal), 0);
+            const servicesTotal = devis.services.reduce((sum, ds) => sum + Number(ds.price), 0);
+            const subtotal = linesTotal + servicesTotal;
+            
+            let remiseAmount = 0;
+            if (devis.remiseType === 'PERCENTAGE') {
+                remiseAmount = subtotal * (Number(devis.remise) / 100);
+            } else {
+                remiseAmount = Number(devis.remise);
+            }
 
+            const totalHT = Math.max(0, subtotal - remiseAmount);
+            const timbreFiscal = Number(devis.timbreFiscal);
+            const totalTTC = totalHT + timbreFiscal;
+
+            // ── Section 4: Totals summary box (right) ────────────────────────
             const sbW  = 215;
             const sbX  = PW - M - sbW;
             const srh  = 16;
             let   sy   = y + 12;
 
-            if (sy + srh * 5 + 10 > PH - 80) { doc.addPage(); sy = M; }
+            if (sy + srh * 6 + 10 > PH - 80) { doc.addPage(); sy = M; }
 
-            strokeRect(sbX, sy, sbW, srh * 5);
-            [1, 2, 3, 4].forEach(i => hline(sbX, sy + srh * i, sbX + sbW));
+            strokeRect(sbX, sy, sbW, srh * 6);
+            [1, 2, 3, 4, 5].forEach(i => hline(sbX, sy + srh * i, sbX + sbW));
 
             const sumRow = (label: string, value: string, i: number, bold?: boolean) => {
                 const ry = sy + srh * i;
@@ -930,12 +976,13 @@ export class DevisService {
                 txt(value, sbX + 118, ry + 4, sbW - 122,   { bold, size: 8, align: 'right' });
             };
 
-            sumRow('Total HT :',    `${totalHT.toFixed(3)} Dt`,      0);
-            sumRow('Exo.',          `${totalHT.toFixed(3)} D`,        1);
-            sumRow('Timbre Fiscal', `${timbreFiscal.toFixed(3)} Dt`,  2);
-            sumRow('Total TTC:',    `${totalTTC.toFixed(3)} Dt`,      3, true);
+            sumRow('Total :',       `${subtotal.toFixed(3)} Dt`,     0);
+            sumRow('Remise :',      `${remiseAmount.toFixed(3)} Dt`,  1);
+            sumRow('Total HT :',    `${totalHT.toFixed(3)} Dt`,      2);
+            sumRow('Timbre Fiscal', `${timbreFiscal.toFixed(3)} Dt`,  3);
+            sumRow('Total TTC:',    `${totalTTC.toFixed(3)} Dt`,      4, true);
             const acompteVal = Number(devis.acompte);
-            sumRow('Acomptes:',     `${acompteVal.toFixed(3)} Dt`,     4);
+            sumRow('Acomptes:',     `${acompteVal.toFixed(3)} Dt`,     5);
 
             // ── Section 5: Payment conditions (left) ─────────────────────────
             const nw = sbX - M - 12;

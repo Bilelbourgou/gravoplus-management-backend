@@ -273,15 +273,25 @@ export class CalculationService {
             0
         );
 
-        const total = linesTotal + servicesTotal;
+        const subtotal = linesTotal + servicesTotal;
+        let remiseAmount = 0;
+
+        if (devis.remiseType === 'PERCENTAGE') {
+            remiseAmount = subtotal * (Number(devis.remise) / 100);
+        } else {
+            remiseAmount = Number(devis.remise);
+        }
+
+        const totalHT = Math.max(0, subtotal - remiseAmount);
+        const totalWithTimbre = totalHT + Number(devis.timbreFiscal);
 
         // Update devis total
         await prisma.devis.update({
             where: { id: devisId },
-            data: { totalAmount: total },
+            data: { totalAmount: totalWithTimbre },
         });
 
-        return Math.round(total * 100) / 100;
+        return Math.round(totalWithTimbre * 100) / 100;
     }
 }
 

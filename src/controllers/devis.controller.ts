@@ -212,6 +212,42 @@ export class DevisController {
         }
     }
 
+    async updateRemise(req: Request, res: Response, next: NextFunction) {
+        try {
+            const { id } = req.params;
+            const { remise, remiseType } = req.body;
+
+            if (remise === undefined || !remiseType) {
+                res.status(400).json({ success: false, error: 'Remise amount and type are required' });
+                return;
+            }
+
+            const total = await devisService.updateRemise(id as string, Number(remise), remiseType);
+
+            res.json({ success: true, data: { totalAmount: total } });
+        } catch (error) {
+            next(error);
+        }
+    }
+
+    async updateTimbreFiscal(req: Request, res: Response, next: NextFunction) {
+        try {
+            const { id } = req.params;
+            const { amount } = req.body;
+
+            if (amount === undefined) {
+                res.status(400).json({ success: false, error: 'Timbre fiscal amount is required' });
+                return;
+            }
+
+            const total = await devisService.updateTimbreFiscal(id as string, Number(amount));
+
+            res.json({ success: true, data: { totalAmount: total } });
+        } catch (error) {
+            next(error);
+        }
+    }
+
     async validate(req: Request, res: Response, next: NextFunction) {
         try {
             const { id } = req.params;

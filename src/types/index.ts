@@ -127,3 +127,8 @@ export interface CreateCustomDevisDto {
     items: CustomDevisItemDto[];
     notes?: string;
 }
+export interface UpdateDevisFinanceDto {
+    remise?: number;
+    remiseType?: 'FIXED' | 'PERCENTAGE';
+    timbreFiscal?: number;
+}
