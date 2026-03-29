@@ -9,6 +9,7 @@ export class CalculationService {
      */
     async calculateLine(input: CalculationInput): Promise<CalculationResult> {
         let unitPrice = 0;
+        const nombre = input.quantity && input.quantity > 0 ? input.quantity : 1;
 
         // If manual price provided (e.g. for SERVICE_MAINTENANCE), use it
         if (input.unitPrice !== undefined && input.unitPrice !== null) {
@@ -208,7 +209,7 @@ export class CalculationService {
                     }
                 }
 
-                const materialMeters = input.quantity && input.quantity > 0 ? input.quantity : 0;
+                const materialMeters = input.materialMeters && input.materialMeters > 0 ? input.materialMeters : 0;
                 const machineCost = input.meters * unitPrice;
                 materialCost = materialMeters * materialUnitPrice;
                 lineTotal = machineCost + materialCost;
@@ -232,6 +233,12 @@ export class CalculationService {
 
             default:
                 throw new ApiError(400, `Unknown machine type: ${input.machineType}`);
+        }
+
+        // Apply global multiplier (Nombre)
+        lineTotal *= nombre;
+        if (nombre > 1) {
+            breakdown = `(${breakdown.split(' = ')[0]}) × ${nombre} = ${lineTotal.toFixed(2)} TND`;
         }
 
         return {

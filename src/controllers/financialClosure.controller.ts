@@ -1,7 +1,7 @@
 
 import { Request, Response } from 'express';
 import prisma from '../config/database';
-import { UserRole } from '../types';
+import { UserRole, DevisStatus, MachineType } from '../types';
 
 // Get caisse devis with role-based filtering
 // Employee: sees own devis
@@ -12,7 +12,15 @@ export const getCaisseDevis = async (req: Request, res: Response) => {
     const userId = req.user?.id;
     const userRole = req.user?.role as UserRole;
 
-    const where: any = { status: 'VALIDATED' };
+    const lastClosure = await prisma.financialClosure.findFirst({
+      orderBy: { periodEnd: 'desc' },
+    });
+    const startDate = lastClosure ? lastClosure.periodEnd : new Date(0);
+
+    const where: any = { 
+        status: DevisStatus.VALIDATED,
+        validatedAt: { gte: startDate }
+    };
 
     if (userRole === UserRole.EMPLOYEE) {
       where.createdById = userId;
@@ -127,23 +135,74 @@ export const getFinancialStats = async (req: Request, res: Response) => {
     const totalExpense = expenses.reduce((sum, e) => sum + Number(e.amount), 0);
     const balance = totalIncome - totalExpense;
 
-    // Aggregate revenue by employee
+    // Fetch validated devis in the period for productivity tracking
+    const devis = await prisma.devis.findMany({
+      where: {
+        status: { in: [DevisStatus.VALIDATED, DevisStatus.INVOICED] },
+        validatedAt: {
+          gte: startDate,
+          lte: endDate,
+        },
+        createdBy: {
+          role: { in: targetRoles }
+        }
+      },
+      include: {
+        createdBy: {
+          select: { id: true, firstName: true, lastName: true, role: true }
+        },
+        lines: {
+          select: { machineType: true, lineTotal: true }
+        }
+      }
+    });
+
+    // Aggregate productivity by employee (based on Validated Devis)
     const revenueByEmployeeMap = new Map<string, { employeeName: string; totalAmount: number; paymentCount: number }>();
-
-    for (const payment of payments) {
-      if (payment.createdBy) {
-        const employeeId = payment.createdById || 'unknown';
-        const employeeName = `${payment.createdBy.firstName} ${payment.createdBy.lastName}`;
-
-        const current = revenueByEmployeeMap.get(employeeId) || { employeeName, totalAmount: 0, paymentCount: 0 };
-        current.totalAmount += Number(payment.amount);
-        current.paymentCount += 1;
+    
+    for (const d of devis) {
+      if (d.createdBy) {
+        const employeeId = d.createdById || 'unknown';
+        const employeeName = `${d.createdBy.firstName} ${d.createdBy.lastName}`;
+        
+        if (!revenueByEmployeeMap.has(employeeId)) {
+          revenueByEmployeeMap.set(employeeId, { employeeName, totalAmount: 0, paymentCount: 0 });
+        }
+        
+        const current = revenueByEmployeeMap.get(employeeId)!;
+        current.totalAmount += Number(d.totalAmount);
+        current.paymentCount += 1; // Here we use it as devis count
         revenueByEmployeeMap.set(employeeId, current);
       }
     }
 
     const revenueByEmployee = Array.from(revenueByEmployeeMap.entries()).map(([employeeId, data]) => ({
       employeeId,
+      ...data
+    })).sort((a, b) => b.totalAmount - a.totalAmount);
+
+    // Aggregate productivity by machine
+    const machineStatsMap = new Map<string, { totalAmount: number; count: number }>();
+    const excludedMachines = [MachineType.SERVICE_MAINTENANCE, MachineType.CUSTOM];
+
+    for (const d of devis) {
+      for (const line of d.lines) {
+        const machine = line.machineType as MachineType;
+        if (excludedMachines.includes(machine)) continue;
+
+        if (!machineStatsMap.has(machine)) {
+          machineStatsMap.set(machine, { totalAmount: 0, count: 0 });
+        }
+        
+        const current = machineStatsMap.get(machine)!;
+        current.totalAmount += Number(line.lineTotal);
+        current.count += 1;
+        machineStatsMap.set(machine, current);
+      }
+    }
+
+    const productivityByMachine = Array.from(machineStatsMap.entries()).map(([machine, data]) => ({
+      machine,
       ...data
     })).sort((a, b) => b.totalAmount - a.totalAmount);
 
@@ -158,6 +217,7 @@ export const getFinancialStats = async (req: Request, res: Response) => {
       payments,
       expenses,
       revenueByEmployee,
+      productivityByMachine,
     });
   } catch (error) {
     console.error('Error fetching financial stats:', error);

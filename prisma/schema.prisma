@@ -86,8 +86,23 @@ model Material {
   
   // Relations
   devisLines  DevisLine[]
+  categoryId  String?
+  category    MaterialCategory? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
   
   @@map("materials")
+}
+
+model MaterialCategory {
+  id        String    @id @default(uuid())
+  name      String    @unique
+  color     String?   @default("#6c757d")
+  icon      String?   @default("cube")
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  materials Material[]
+
+  @@map("material_categories")
 }
 
 model MaintenanceMaterial {
@@ -160,8 +175,9 @@ model DevisLine {
   
   // Calculation inputs
   minutes       Decimal?  // For CNC, Laser
-  meters        Decimal?  // For Champs
-  quantity      Int?      // For Panneaux
+  meters        Decimal?  // For Champs (machine)
+  materialMeters Decimal?  // For Pliage (material)
+  quantity      Int?      @default(1) // Number of pieces (global multiplier)
   width         Decimal?  // For CNC, Laser (m or cm)
   height        Decimal?  // For CNC, Laser (m or cm)
   dimensionUnit String?   @default("m") // "m" | "cm"

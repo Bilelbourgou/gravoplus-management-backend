@@ -127,22 +127,24 @@ export class MaterialService {
     async getAll() {
         return prisma.material.findMany({
             where: { isActive: true },
+            include: { category: true },
             orderBy: { name: 'asc' },
         });
     }
 
-    async create(name: string, pricePerUnit: number, unit: string, description?: string) {
+    async create(name: string, pricePerUnit: number, unit: string, description?: string, categoryId?: string) {
         return prisma.material.create({
             data: {
                 name,
                 pricePerUnit,
                 unit,
                 description,
+                categoryId,
             },
         });
     }
 
-    async update(id: string, data: { name?: string; pricePerUnit?: number; unit?: string; description?: string }) {
+    async update(id: string, data: { name?: string; pricePerUnit?: number; unit?: string; description?: string; categoryId?: string; isActive?: boolean }) {
         const material = await prisma.material.findUnique({ where: { id } });
 
         if (!material) {
@@ -156,6 +158,8 @@ export class MaterialService {
                 ...(data.pricePerUnit !== undefined && { pricePerUnit: data.pricePerUnit }),
                 ...(data.unit && { unit: data.unit }),
                 ...(data.description !== undefined && { description: data.description }),
+                ...(data.categoryId !== undefined && { categoryId: data.categoryId }),
+                ...(data.isActive !== undefined && { isActive: data.isActive }),
             },
         });
     }

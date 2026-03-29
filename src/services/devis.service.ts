@@ -213,6 +213,7 @@ export class DevisService {
                 clientId: data.clientId,
                 createdById: userId,
                 notes: data.notes,
+                timbreFiscal: 0,
             },
             include: {
                 client: true,
@@ -406,6 +407,7 @@ export class DevisService {
             width: data.width,
             height: data.height,
             dimensionUnit: data.dimensionUnit,
+            materialMeters: data.materialMeters,
         });
 
         const line = await prisma.devisLine.create({
@@ -424,6 +426,7 @@ export class DevisService {
                 width: data.width ?? null,
                 height: data.height ?? null,
                 dimensionUnit: data.dimensionUnit ?? 'm',
+                materialMeters: data.materialMeters ?? null,
             },
             include: {
                 material: true,
@@ -705,6 +708,11 @@ export class DevisService {
         });
 
         await prisma.devisService.deleteMany({
+            where: { devisId },
+        });
+        
+        // Delete associated payments to keep caisse balance accurate
+        await prisma.payment.deleteMany({
             where: { devisId },
         });
 

@@ -13,10 +13,10 @@ export class ExpenseController {
             if (startDate) filters.startDate = new Date(startDate as string);
             if (endDate) filters.endDate = new Date(endDate as string);
 
-            // Admin should not see superadmin-created expenses
-
             if (userRole === UserRole.ADMIN) {
                 filters.excludeSuperadmin = true;
+            } else if (userRole === UserRole.EMPLOYEE) {
+                // Future: add employee specific filters if needed
             }
 
             const expenses = await expenseService.getAllExpenses(

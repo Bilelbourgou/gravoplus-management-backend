@@ -81,6 +81,7 @@ export interface AddDevisLineDto {
     width?: number;
     height?: number;
     dimensionUnit?: string;
+    materialMeters?: number;
 }
 
 export interface AddDevisServiceDto {
@@ -99,6 +100,7 @@ export interface CalculationInput {
     width?: number;
     height?: number;
     dimensionUnit?: string;
+    materialMeters?: number;
 }
 
 export interface CalculationResult {
