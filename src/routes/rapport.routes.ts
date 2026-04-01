@@ -14,10 +14,13 @@ router.get('/yearly', isSuperAdmin, async (req: Request, res: Response) => {
         const startDate = new Date(year, 0, 1);
         const endDate = new Date(year + 1, 0, 1);
 
-        // Get all devis for the year with relations
         const devis = await prisma.devis.findMany({
             where: {
                 createdAt: { gte: startDate, lt: endDate },
+                OR: [
+                    { status: { in: ['VALIDATED', 'INVOICED'] } },
+                    { type: 'ENCAISSEMENT' }
+                ]
             },
             include: {
                 client: true,
@@ -74,14 +77,16 @@ router.get('/yearly', isSuperAdmin, async (req: Request, res: Response) => {
             };
         });
 
-        const paidDevisCount = devisWithPaymentInfo.filter((d) => d.isFullyPaid).length;
-        const unpaidDevisCount = devisWithPaymentInfo.filter((d) => !d.isFullyPaid && Number(d.totalAmount) > 0).length;
+        const paidDevisCount = devisWithPaymentInfo.filter((d) => d.remaining <= 0).length;
+        const unpaidDevisCount = devisWithPaymentInfo.filter((d) => d.remaining > 0).length;
+        
+        // Sum of all payments received across these devis
         const totalPaidAmount = devisWithPaymentInfo
-            .filter((d) => d.isFullyPaid)
-            .reduce((s, d) => s + Number(d.totalAmount), 0);
+            .reduce((s, d) => s + Number(d.totalPaid), 0);
+            
+        // Sum of remaining balance for all devis
         const totalUnpaidAmount = devisWithPaymentInfo
-            .filter((d) => !d.isFullyPaid && Number(d.totalAmount) > 0)
-            .reduce((s, d) => s + d.remaining, 0);
+            .reduce((s, d) => s + Number(d.remaining), 0);
 
         res.json({
             year,

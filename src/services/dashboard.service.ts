@@ -173,6 +173,10 @@ export class DashboardService {
                     gte: todayStart,
                     lte: todayEnd,
                 },
+                OR: [
+                    { status: { in: ['VALIDATED', 'INVOICED'] } },
+                    { type: 'ENCAISSEMENT' }
+                ]
             },
         });
 
