@@ -173,7 +173,7 @@ export class DevisService {
         await notificationService.create({
             type: 'DEVIS_CREATED',
             title: 'Nouveau devis',
-            message: `Devis ${devis.reference} créé pour ${client.name}`,
+            message: `Devis ${devis.reference} créé pour ${client?.name || 'Client'}`,
             entityType: 'devis',
             entityId: devis.id,
             triggeredById: userId,
@@ -267,7 +267,7 @@ export class DevisService {
         await notificationService.create({
             type: 'DEVIS_VALIDATED',
             title: 'Nouvel encaissement',
-            message: `Encaissement ${encaissement.reference} finalisé pour ${encaissement.client.name} - ${totalAmount.toFixed(3)} TND`,
+            message: `Encaissement ${encaissement.reference} finalisé pour ${encaissement.client?.name || 'Client Supprimé'} - ${totalAmount.toFixed(3)} TND`,
             entityType: 'devis',
             entityId: encaissementId,
             triggeredById: userId,
@@ -355,7 +355,7 @@ export class DevisService {
         await notificationService.create({
             type: 'DEVIS_CREATED',
             title: 'Nouveau devis personnalisé',
-            message: `Devis ${reference} créé pour ${client.name}`,
+            message: `Devis ${reference} créé pour ${client?.name || 'Client'}`,
             entityType: 'devis',
             entityId: devis!.id,
             triggeredById: userId,
@@ -640,7 +640,7 @@ export class DevisService {
             await notificationService.create({
                 type: 'PAYMENT_RECEIVED',
                 title: 'Acompte reçu',
-                message: `Acompte de ${acompteAmount.toFixed(3)} TND reçu pour ${devis.client.name} (${devis.reference})`,
+                message: `Acompte de ${acompteAmount.toFixed(3)} TND reçu pour ${devis.client?.name || 'Client Supprimé'} (${devis.reference})`,
                 entityType: 'payment',
                 entityId: devis.id,
                 triggeredById: userId,
@@ -772,6 +772,29 @@ export class DevisService {
             data: { notes },
         });
     }
+
+    /**
+     * Update devis totalAmount (SuperAdmin override)
+     */
+    async updateAmount(devisId: string, amount: number) {
+        const devis = await prisma.devis.findUnique({
+            where: { id: devisId },
+        });
+
+        if (!devis) {
+            throw new ApiError(404, 'Devis not found');
+        }
+
+        if (amount < 0) {
+            throw new ApiError(400, 'Le montant ne peut pas être négatif');
+        }
+
+        return prisma.devis.update({
+            where: { id: devisId },
+            data: { totalAmount: amount },
+            include: { client: true },
+        });
+    }
     /**
      * Generate PDF for a devis
      */
@@ -857,10 +880,10 @@ export class DevisService {
             // Client info box
             const cbX = PW - M - 200;
             strokeRect(cbX, y, 200, 80);
-            txt(client.name,          cbX + 5, y + 14, 190, { bold: true, size: 10 });
-            if (client.address) txt(client.address,  cbX + 5, y + 30, 190, { size: 8 });
-            if (client.phone)   txt(`Tél: ${client.phone}`, cbX + 5, y + 42, 190, { size: 8 });
-            if (client.email)   txt(client.email,    cbX + 5, y + 54, 190, { size: 8 });
+            txt(client?.name || 'Client Supprimé',    cbX + 5, y + 14, 190, { bold: true, size: 10 });
+            if (client?.address) txt(client.address,  cbX + 5, y + 30, 190, { size: 8 });
+            if (client?.phone)   txt(`Tél: ${client.phone}`, cbX + 5, y + 42, 190, { size: 8 });
+            if (client?.email)   txt(client.email,    cbX + 5, y + 54, 190, { size: 8 });
 
             // ── Section 2: Devis reference table ─────────────────────────────
             y = M + 208;
@@ -885,7 +908,7 @@ export class DevisService {
             txt(devis.reference,                             M + cw4 * 0 + 5, y + 5, cw4 - 10, { size: 9 });
             txt(devis.createdAt.toLocaleDateString('fr-FR'), M + cw4 * 1 + 5, y + 5, cw4 - 10, { size: 9 });
             txt(validityDate.toLocaleDateString('fr-FR'),    M + cw4 * 2 + 5, y + 5, cw4 - 10, { size: 9 });
-            txt(client.id.slice(-7).toUpperCase(),           M + cw4 * 3 + 5, y + 5, cw4 - 10, { size: 9 });
+            txt(client?.id ? client.id.slice(-7).toUpperCase() : '-',           M + cw4 * 3 + 5, y + 5, cw4 - 10, { size: 9 });
             [1, 2, 3].forEach(i => vline(M + cw4 * i, y, y + rh));
 
             // ── Section 3: Items table ────────────────────────────────────────

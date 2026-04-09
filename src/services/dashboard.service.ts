@@ -113,7 +113,7 @@ export class DashboardService {
         const recentDevis = recentDevisRaw.map((d) => ({
             id: d.id,
             reference: d.reference,
-            clientName: d.client.name,
+            clientName: d.client?.name || 'Client Supprimé',
             totalAmount: Number(d.totalAmount),
             status: d.status,
             createdAt: d.createdAt,
@@ -215,10 +215,12 @@ export class DashboardService {
 
         const clientBalances = new Map<string, { clientName: string; totalAmount: number; totalPaid: number }>();
         for (const d of validatedDevis) {
-            const existing = clientBalances.get(d.clientId) || { clientName: d.client.name, totalAmount: 0, totalPaid: 0 };
+            const clientId = d.clientId || 'deleted';
+            const clientName = d.client?.name || 'Client Supprimé';
+            const existing = clientBalances.get(clientId) || { clientName, totalAmount: 0, totalPaid: 0 };
             existing.totalAmount += Number(d.totalAmount);
             existing.totalPaid += d.payments.reduce((s, p) => s + Number(p.amount), 0);
-            clientBalances.set(d.clientId, existing);
+            clientBalances.set(clientId, existing);
         }
 
         const unpaidClients = Array.from(clientBalances.entries())

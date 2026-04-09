@@ -89,7 +89,7 @@ export class ClientService {
     /**
      * Delete client
      */
-    async deleteClient(clientId: string) {
+    async deleteClient(clientId: string, force: boolean = false) {
         const client = await prisma.client.findUnique({
             where: { id: clientId },
             include: {
@@ -103,7 +103,7 @@ export class ClientService {
             throw new ApiError(404, 'Client not found');
         }
 
-        if (client._count.devis > 0) {
+        if (client._count.devis > 0 && !force) {
             throw new ApiError(400, 'Cannot delete client with existing quotes');
         }
 

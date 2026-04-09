@@ -294,6 +294,27 @@ export class DevisController {
         }
     }
 
+    async updateAmount(req: Request, res: Response, next: NextFunction) {
+        try {
+            const { id } = req.params;
+            const { amount } = req.body;
+
+            if (amount === undefined || amount === null) {
+                res.status(400).json({ success: false, error: 'Amount is required' });
+                return;
+            }
+
+            const devis = await devisService.updateAmount(id as string, Number(amount));
+
+            res.json({
+                success: true,
+                data: devis,
+            });
+        } catch (error) {
+            next(error);
+        }
+    }
+
     async updateStatus(req: Request, res: Response, next: NextFunction) {
         try {
             const { id } = req.params;

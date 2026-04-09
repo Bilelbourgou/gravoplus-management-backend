@@ -91,7 +91,7 @@ export class InvoiceService {
         await notificationService.create({
             type: 'INVOICE_CREATED',
             title: 'Nouvelle facture',
-            message: `Facture ${invoice.reference} créée pour ${client.name}`,
+            message: `Facture ${invoice.reference} créée pour ${client?.name || 'Client'}`,
             entityType: 'invoice',
             entityId: invoice.id,
         });
@@ -123,7 +123,7 @@ export class InvoiceService {
         }
 
         // Validate all devis belong to same client
-        const clientIds = [...new Set(devisList.map(d => d.clientId))];
+        const clientIds = [...new Set(devisList.map(d => d.clientId).filter((id): id is string => !!id))];
         if (clientIds.length > 1) {
             throw new ApiError(400, 'All devis must belong to the same client');
         }
@@ -156,7 +156,7 @@ export class InvoiceService {
         }
 
         const reference = await this.generateReference();
-        const clientId = clientIds[0];
+        const clientId = clientIds[0] || null;
         const totalAmount = devisList.reduce((sum, d) => sum + Number(d.totalAmount), 0);
 
         // Create invoice and update all devis in a transaction
@@ -164,9 +164,9 @@ export class InvoiceService {
             const newInvoice = await tx.invoice.create({
                 data: {
                     reference,
-                    clientId,
                     totalAmount,
-                },
+                    ...(clientId ? { clientId } : {}),
+                } as any,
             });
 
             // Update all devis to link to invoice and set status
@@ -182,7 +182,7 @@ export class InvoiceService {
         });
 
         // Fetch client for notification
-        const client = await prisma.client.findUnique({ where: { id: clientId } });
+        const client = clientId ? await prisma.client.findUnique({ where: { id: clientId } }) : null;
 
         // Create notification
         await notificationService.create({
@@ -244,10 +244,10 @@ export class InvoiceService {
             // Client info
             doc.font('Helvetica-Bold').text('Client:');
             doc.font('Helvetica');
-            doc.text(client.name);
-            if (client.phone) doc.text(`Tél: ${client.phone}`);
-            if (client.email) doc.text(`Email: ${client.email}`);
-            if (client.address) doc.text(`Adresse: ${client.address}`);
+            doc.text(client?.name || 'Client Supprimé');
+            if (client?.phone) doc.text(`Tél: ${client.phone}`);
+            if (client?.email) doc.text(`Email: ${client.email}`);
+            if (client?.address) doc.text(`Adresse: ${client.address}`);
             doc.moveDown();
 
             // Line items

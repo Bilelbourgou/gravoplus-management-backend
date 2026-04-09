@@ -83,7 +83,8 @@ export class ClientController {
     async delete(req: Request, res: Response, next: NextFunction) {
         try {
             const { id } = req.params;
-            const result = await clientService.deleteClient(id as string);
+            const isSuperAdmin = req.user?.role === 'SUPERADMIN';
+            const result = await clientService.deleteClient(id as string, isSuperAdmin);
 
             res.json({
                 success: true,

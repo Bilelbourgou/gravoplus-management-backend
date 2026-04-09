@@ -7,12 +7,26 @@ const router = Router();
 
 router.use(authenticate);
 
-// GET /api/rapport/yearly?year=2025
+// GET /api/rapport/yearly?year=2025&month=1&day=1
 router.get('/yearly', isSuperAdmin, async (req: Request, res: Response) => {
     try {
         const year = parseInt(req.query.year as string) || new Date().getFullYear();
-        const startDate = new Date(year, 0, 1);
-        const endDate = new Date(year + 1, 0, 1);
+        const month = req.query.month ? parseInt(req.query.month as string) - 1 : null; // 0-indexed
+        const day = req.query.day ? parseInt(req.query.day as string) : null;
+
+        let startDate: Date;
+        let endDate: Date;
+
+        if (day !== null && month !== null) {
+            startDate = new Date(year, month, day);
+            endDate = new Date(year, month, day + 1);
+        } else if (month !== null) {
+            startDate = new Date(year, month, 1);
+            endDate = new Date(year, month + 1, 1);
+        } else {
+            startDate = new Date(year, 0, 1);
+            endDate = new Date(year + 1, 0, 1);
+        }
 
         const devis = await prisma.devis.findMany({
             where: {
@@ -33,7 +47,7 @@ router.get('/yearly', isSuperAdmin, async (req: Request, res: Response) => {
             orderBy: { createdAt: 'desc' },
         });
 
-        // Get all invoices for the year
+        // Get all invoices for the period
         const invoices = await prisma.invoice.findMany({
             where: {
                 createdAt: { gte: startDate, lt: endDate },
@@ -46,7 +60,7 @@ router.get('/yearly', isSuperAdmin, async (req: Request, res: Response) => {
             orderBy: { createdAt: 'desc' },
         });
 
-        // Get all expenses for the year
+        // Get all expenses for the period
         const expenses = await prisma.expense.findMany({
             where: {
                 date: { gte: startDate, lt: endDate },
@@ -56,6 +70,53 @@ router.get('/yearly', isSuperAdmin, async (req: Request, res: Response) => {
             },
             orderBy: { date: 'desc' },
         });
+
+        // Aggregate productivity by employee
+        const revenueByEmployeeMap = new Map<string, { employeeName: string; totalAmount: number; paymentCount: number }>();
+        for (const d of devis) {
+            if (d.createdBy) {
+                const employeeId = d.createdById || 'unknown';
+                const employeeName = `${d.createdBy.firstName} ${d.createdBy.lastName}`;
+                
+                if (!revenueByEmployeeMap.has(employeeId)) {
+                    revenueByEmployeeMap.set(employeeId, { employeeName, totalAmount: 0, paymentCount: 0 });
+                }
+                
+                const current = revenueByEmployeeMap.get(employeeId)!;
+                current.totalAmount += Number(d.totalAmount);
+                current.paymentCount += 1;
+                revenueByEmployeeMap.set(employeeId, current);
+            }
+        }
+        const revenueByEmployee = Array.from(revenueByEmployeeMap.entries()).map(([employeeId, data]) => ({
+            employeeId,
+            ...data
+        })).sort((a, b) => b.totalAmount - a.totalAmount);
+
+        // Aggregate productivity by machine
+        const machineStatsMap = new Map<string, { totalAmount: number; count: number }>();
+        const MachineType = { SERVICE_MAINTENANCE: 'SERVICE_MAINTENANCE', CUSTOM: 'CUSTOM' }; // Mock or import if needed, but strings are fine
+        const excludedMachines = [MachineType.SERVICE_MAINTENANCE, MachineType.CUSTOM];
+
+        for (const d of devis) {
+            for (const line of d.lines) {
+                const machine = line.machineType;
+                if (excludedMachines.includes(machine)) continue;
+
+                if (!machineStatsMap.has(machine)) {
+                    machineStatsMap.set(machine, { totalAmount: 0, count: 0 });
+                }
+                
+                const current = machineStatsMap.get(machine)!;
+                current.totalAmount += Number(line.lineTotal);
+                current.count += 1;
+                machineStatsMap.set(machine, current);
+            }
+        }
+        const productivityByMachine = Array.from(machineStatsMap.entries()).map(([machine, data]) => ({
+            machine,
+            ...data
+        })).sort((a, b) => b.totalAmount - a.totalAmount);
 
         // Calculate stats
         const totalDevis = devis.length;
@@ -80,16 +141,13 @@ router.get('/yearly', isSuperAdmin, async (req: Request, res: Response) => {
         const paidDevisCount = devisWithPaymentInfo.filter((d) => d.remaining <= 0).length;
         const unpaidDevisCount = devisWithPaymentInfo.filter((d) => d.remaining > 0).length;
         
-        // Sum of all payments received across these devis
-        const totalPaidAmount = devisWithPaymentInfo
-            .reduce((s, d) => s + Number(d.totalPaid), 0);
-            
-        // Sum of remaining balance for all devis
-        const totalUnpaidAmount = devisWithPaymentInfo
-            .reduce((s, d) => s + Number(d.remaining), 0);
+        const totalPaidAmount = devisWithPaymentInfo.reduce((s, d) => s + Number(d.totalPaid), 0);
+        const totalUnpaidAmount = devisWithPaymentInfo.reduce((s, d) => s + Number(d.remaining), 0);
 
         res.json({
             year,
+            month: month !== null ? month + 1 : null,
+            day,
             stats: {
                 totalDevis,
                 totalDevisAmount,
@@ -105,6 +163,8 @@ router.get('/yearly', isSuperAdmin, async (req: Request, res: Response) => {
             devis: devisWithPaymentInfo,
             invoices,
             expenses,
+            revenueByEmployee,
+            productivityByMachine,
         });
     } catch (error: any) {
         console.error('Error fetching yearly report:', error);

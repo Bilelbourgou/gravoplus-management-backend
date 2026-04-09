@@ -190,7 +190,7 @@ export class PaymentService {
             const payment = await prisma.payment.create({
                 data: {
                     amount: payAmount,
-                    description: data.description || `Paiement client ${client.name}`,
+                    description: data.description || `Paiement client ${client?.name || 'Client'}`,
                     devisId: devis.id,
                     paymentDate: data.paymentDate ? new Date(data.paymentDate) : new Date(),
                     paymentMethod: data.paymentMethod,
@@ -211,7 +211,7 @@ export class PaymentService {
         await notificationService.create({
             type: 'PAYMENT_RECEIVED',
             title: 'Paiement reçu',
-            message: `Paiement de ${Number(data.amount).toFixed(3)} TND reçu pour ${client.name} (réparti sur ${createdPayments.length} devis)`,
+            message: `Paiement de ${Number(data.amount).toFixed(3)} TND reçu pour ${client?.name || 'Client'} (réparti sur ${createdPayments.length} devis)`,
             entityType: 'payment',
             entityId: createdPayments[0]?.id,
             triggeredById: userId,

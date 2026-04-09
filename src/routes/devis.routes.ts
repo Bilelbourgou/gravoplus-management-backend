@@ -38,6 +38,7 @@ router.patch('/:id/acompte', isSuperAdmin, devisController.updateAcompte.bind(de
 // Remise and Timbre Fiscal (SuperAdmin only)
 router.patch('/:id/remise', isSuperAdmin, devisController.updateRemise.bind(devisController));
 router.patch('/:id/timbre-fiscal', isSuperAdmin, devisController.updateTimbreFiscal.bind(devisController));
+router.patch('/:id/amount', isSuperAdmin, devisController.updateAmount.bind(devisController));
 
 // Admin only routes
 router.post('/:id/validate', isEmployeeOrAdmin, devisController.validate.bind(devisController));
