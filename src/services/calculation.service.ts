@@ -110,20 +110,15 @@ export class CalculationService {
                 break;
 
             case MachineType.PANNEAUX:
-                // Panneaux: quantity × unitPrice
-                if (!input.quantity || input.quantity <= 0) {
-                    throw new ApiError(400, 'Quantity is required for Panneaux calculation');
-                }
-                lineTotal = input.quantity * unitPrice;
-                breakdown = `${input.quantity} units × ${unitPrice} TND/unit = ${lineTotal.toFixed(2)} TND`;
+                // Panneaux: unitPrice (quantity handled by global multiplier)
+                lineTotal = unitPrice;
+                breakdown = `1 unit × ${unitPrice} TND/unit = ${lineTotal.toFixed(2)} TND`;
                 break;
 
             case MachineType.SERVICE_MAINTENANCE:
-                // Service Maintenance: can use maintenance material, fixed service, or manual price
-                const maintenanceQty = input.quantity && input.quantity > 0 ? input.quantity : 1;
-
+                // Service Maintenance: calculate base price for ONE unit (quantity handled by global multiplier)
                 if (input.maintenanceMaterialId) {
-                    // Using maintenance material - calculate based on maintenance material price × quantity
+                    // Using maintenance material
                     const maintenanceMaterial = await prisma.maintenanceMaterial.findUnique({
                         where: { id: input.maintenanceMaterialId },
                     });
@@ -131,10 +126,10 @@ export class CalculationService {
                         throw new ApiError(404, 'Maintenance material not found');
                     }
                     const materialPrice = Number(maintenanceMaterial.pricePerUnit);
-                    lineTotal = maintenanceQty * materialPrice;
-                    breakdown = `${maintenanceMaterial.name}: ${maintenanceQty} ${maintenanceMaterial.unit} × ${materialPrice.toFixed(2)} TND = ${lineTotal.toFixed(2)} TND`;
+                    lineTotal = materialPrice;
+                    breakdown = `${maintenanceMaterial.name}: 1 ${maintenanceMaterial.unit} × ${materialPrice.toFixed(2)} TND = ${lineTotal.toFixed(2)} TND`;
                 } else if (input.serviceId) {
-                    // Using fixed service - calculate based on service price × quantity
+                    // Using fixed service
                     const fixedService = await prisma.fixedService.findUnique({
                         where: { id: input.serviceId },
                     });
@@ -142,12 +137,12 @@ export class CalculationService {
                         throw new ApiError(404, 'Service not found');
                     }
                     const servicePrice = Number(fixedService.price);
-                    lineTotal = maintenanceQty * servicePrice;
-                    breakdown = `${fixedService.name}: ${maintenanceQty} × ${servicePrice.toFixed(2)} TND = ${lineTotal.toFixed(2)} TND`;
+                    lineTotal = servicePrice;
+                    breakdown = `${fixedService.name}: 1 × ${servicePrice.toFixed(2)} TND = ${lineTotal.toFixed(2)} TND`;
                 } else {
                     // Manual price entry
-                    lineTotal = maintenanceQty * unitPrice;
-                    breakdown = `${maintenanceQty} ${maintenanceQty > 1 ? 'services' : 'service'} × ${unitPrice} TND = ${lineTotal.toFixed(2)} TND`;
+                    lineTotal = unitPrice;
+                    breakdown = `1 service × ${unitPrice} TND = ${lineTotal.toFixed(2)} TND`;
                 }
                 break;
 
@@ -222,13 +217,12 @@ export class CalculationService {
                 break;
 
             case MachineType.CUSTOM:
-                // Custom: quantity × unitPrice (both provided by user)
+                // Custom: unitPrice (quantity handled by global multiplier)
                 if (!input.unitPrice || input.unitPrice <= 0) {
                     throw new ApiError(400, 'Unit price is required for Custom items');
                 }
-                const customQty = input.quantity && input.quantity > 0 ? input.quantity : 1;
-                lineTotal = customQty * unitPrice;
-                breakdown = `${customQty} × ${unitPrice} TND = ${lineTotal.toFixed(2)} TND`;
+                lineTotal = unitPrice;
+                breakdown = `1 × ${unitPrice} TND = ${lineTotal.toFixed(2)} TND`;
                 break;
 
             default:

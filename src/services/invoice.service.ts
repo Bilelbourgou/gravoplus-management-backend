@@ -284,22 +284,41 @@ export class InvoiceService {
                         line.meters ? `${line.meters} m` :
                             `${line.quantity} unités`;
 
+                    const descHeight = doc.heightOfString(desc, { width: 240 });
+                    const rowHeight = Math.max(descHeight, 15);
+
+                    // Check for page break
+                    if (y + rowHeight + 20 > doc.page.height - 100) {
+                        doc.addPage();
+                        y = 50;
+                    }
+
                     doc.text(desc, 50, y, { width: 240 });
                     doc.text(qty, 300, y);
                     doc.text(`${Number(line.unitPrice).toFixed(2)} TND`, 380, y);
                     doc.text(`${Number(line.lineTotal).toFixed(2)} TND`, 460, y);
 
-                    y += 20;
+                    y += rowHeight + 5;
                 }
 
                 // Services
                 for (const ds of devis.services) {
-                    doc.text(ds.service.name, 50, y);
+                    const servName = ds.service.name;
+                    const servHeight = doc.heightOfString(servName, { width: 240 });
+                    const rowHeight = Math.max(servHeight, 15);
+
+                    // Check for page break
+                    if (y + rowHeight + 20 > doc.page.height - 100) {
+                        doc.addPage();
+                        y = 50;
+                    }
+
+                    doc.text(servName, 50, y, { width: 240 });
                     doc.text('1', 300, y);
                     doc.text(`${Number(ds.price).toFixed(2)} TND`, 380, y);
                     doc.text(`${Number(ds.price).toFixed(2)} TND`, 460, y);
 
-                    y += 20;
+                    y += rowHeight + 5;
                 }
 
                 // Add spacing between devis if multiple

@@ -853,7 +853,7 @@ export class DevisService {
                 doc.font(opts?.bold ? 'Helvetica-Bold' : 'Helvetica')
                    .fontSize(opts?.size ?? 8)
                    .fillColor(opts?.color ?? '#000')
-                   .text(text, x, ty, { width: w, lineBreak: false });
+                   .text(text, x, ty, { width: w, align: opts?.align ?? 'left' });
             };
 
             // ── Logo ─────────────────────────────────────────────────────────
@@ -926,23 +926,31 @@ export class DevisService {
             ];
             const HEADERS = ['Réf', 'Désignation', 'Unité', 'Quantité', 'PU HT', 'Remise', 'Total HT'];
             const HALIGN: Array<'left' | 'right' | 'center'> = ['center', 'left', 'center', 'right', 'right', 'center', 'right'];
-            const rowH = 18;
+            const minRowH = 18;
 
             // Table header row
-            fillRect(M, y, CW, rowH, '#e0e0e0');
+            fillRect(M, y, CW, minRowH, '#e0e0e0');
             C.forEach((c, i) => txt(HEADERS[i], c.x + 2, y + 5, c.w - 4, { bold: true, align: HALIGN[i] }));
-            C.slice(1).forEach(c => vline(c.x, y, y + rowH));
-            y += rowH;
+            C.slice(1).forEach(c => vline(c.x, y, y + minRowH));
+            y += minRowH;
 
             // Helper: draw one data row
             const drawRow = (cols: string[]) => {
-                if (y + rowH > PH - 190) { doc.addPage(); y = M; }
-                hline(M, y + rowH, M + CW);
-                vline(M, y, y + rowH);
-                vline(M + CW, y, y + rowH);
-                C.slice(1).forEach(c => vline(c.x, y, y + rowH));
+                const colHeights = cols.map((text, i) => doc.heightOfString(text, { width: C[i].w - 4 }));
+                const actualRowH = Math.max(minRowH, ...colHeights) + 4;
+
+                if (y + actualRowH > PH - 190) {
+                    doc.addPage();
+                    y = M;
+                    // Redraw header on new page? (Optional, skipping for now to match old behavior but could be nice)
+                }
+
+                hline(M, y + actualRowH, M + CW);
+                vline(M, y, y + actualRowH);
+                vline(M + CW, y, y + actualRowH);
+                C.slice(1).forEach(c => vline(c.x, y, y + actualRowH));
                 C.forEach((c, i) => txt(cols[i] ?? '', c.x + 2, y + 5, c.w - 4, { align: HALIGN[i] }));
-                y += rowH;
+                y += actualRowH;
             };
 
             let lineNum = 1;
