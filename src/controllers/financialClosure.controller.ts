@@ -105,7 +105,7 @@ export const getFinancialStats = async (req: Request, res: Response) => {
           }
         },
         createdBy: {
-          select: { firstName: true, lastName: true }
+          select: { firstName: true, lastName: true, role: true }
         }
       },
       orderBy: { paymentDate: 'desc' },
@@ -124,7 +124,7 @@ export const getFinancialStats = async (req: Request, res: Response) => {
       },
       include: {
         createdBy: {
-          select: { firstName: true, lastName: true },
+          select: { firstName: true, lastName: true, role: true },
         },
       },
       orderBy: { date: 'desc' },
@@ -206,6 +206,23 @@ export const getFinancialStats = async (req: Request, res: Response) => {
       ...data
     })).sort((a, b) => b.totalAmount - a.totalAmount);
 
+    // Scope breakdown for SUPERADMIN
+    let adminScope = null;
+    let superadminScope = null;
+    if (userRole === UserRole.SUPERADMIN) {
+      const adminRoles = [UserRole.EMPLOYEE, UserRole.ADMIN];
+      const adminPayments = payments.filter((p: any) => adminRoles.includes(p.createdBy?.role));
+      const adminExpenses = expenses.filter((e: any) => adminRoles.includes(e.createdBy?.role));
+      const saPayments = payments.filter((p: any) => p.createdBy?.role === UserRole.SUPERADMIN);
+      const saExpenses = expenses.filter((e: any) => e.createdBy?.role === UserRole.SUPERADMIN);
+      const adminIncome = adminPayments.reduce((s: number, p: any) => s + Number(p.amount), 0);
+      const adminExpense = adminExpenses.reduce((s: number, e: any) => s + Number(e.amount), 0);
+      const saIncome = saPayments.reduce((s: number, p: any) => s + Number(p.amount), 0);
+      const saExpense = saExpenses.reduce((s: number, e: any) => s + Number(e.amount), 0);
+      adminScope = { totalIncome: adminIncome, totalExpense: adminExpense, balance: adminIncome - adminExpense, payments: adminPayments, expenses: adminExpenses };
+      superadminScope = { totalIncome: saIncome, totalExpense: saExpense, balance: saIncome - saExpense, payments: saPayments, expenses: saExpenses };
+    }
+
     res.json({
       periodStart: lastClosure ? startDate : null,
       periodEnd: endDate,
@@ -218,6 +235,8 @@ export const getFinancialStats = async (req: Request, res: Response) => {
       expenses,
       revenueByEmployee,
       productivityByMachine,
+      adminScope,
+      superadminScope,
     });
   } catch (error) {
     console.error('Error fetching financial stats:', error);
@@ -303,7 +322,7 @@ export const getClosureHistory = async (req: Request, res: Response) => {
       orderBy: { closureDate: 'desc' },
       include: {
         createdBy: {
-          select: { firstName: true, lastName: true },
+          select: { firstName: true, lastName: true, role: true },
         },
       },
     });

@@ -33,7 +33,7 @@ router.get('/yearly', isSuperAdmin, async (req: Request, res: Response) => {
                 createdAt: { gte: startDate, lt: endDate },
                 OR: [
                     { status: { in: ['VALIDATED', 'INVOICED'] } },
-                    { type: 'ENCAISSEMENT' }
+                    { AND: [{ type: 'ENCAISSEMENT' }, { status: { not: 'CANCELLED' } }] },
                 ]
             },
             include: {
@@ -141,8 +141,8 @@ router.get('/yearly', isSuperAdmin, async (req: Request, res: Response) => {
         const paidDevisCount = devisWithPaymentInfo.filter((d) => d.remaining <= 0).length;
         const unpaidDevisCount = devisWithPaymentInfo.filter((d) => d.remaining > 0).length;
         
-        const totalPaidAmount = devisWithPaymentInfo.reduce((s, d) => s + Number(d.totalPaid), 0);
-        const totalUnpaidAmount = devisWithPaymentInfo.reduce((s, d) => s + Number(d.remaining), 0);
+        const totalPaidAmount = devisWithPaymentInfo.reduce((s, d) => s + Math.min(Number(d.totalPaid), Number(d.totalAmount)), 0);
+        const totalUnpaidAmount = devisWithPaymentInfo.reduce((s, d) => s + Math.max(0, Number(d.remaining)), 0);
 
         res.json({
             year,
@@ -158,7 +158,7 @@ router.get('/yearly', isSuperAdmin, async (req: Request, res: Response) => {
                 unpaidDevisCount,
                 totalPaidAmount,
                 totalUnpaidAmount,
-                netProfit: totalInvoiceAmount - totalExpenses,
+                netProfit: totalDevisAmount - totalExpenses,
             },
             devis: devisWithPaymentInfo,
             invoices,

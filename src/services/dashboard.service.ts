@@ -63,8 +63,9 @@ export class DashboardService {
             prisma.invoice.count(),
         ]);
 
-        // Get revenue from all payments (new devis-based flow)
+        // Get revenue from payments linked to devis (orphan payments excluded)
         const allPayments = await prisma.payment.findMany({
+            where: { devisId: { not: null } },
             select: { amount: true, paymentDate: true },
         });
 
@@ -175,7 +176,7 @@ export class DashboardService {
                 },
                 OR: [
                     { status: { in: ['VALIDATED', 'INVOICED'] } },
-                    { type: 'ENCAISSEMENT' }
+                    { AND: [{ type: 'ENCAISSEMENT' }, { status: { not: 'CANCELLED' } }] },
                 ]
             },
         });
